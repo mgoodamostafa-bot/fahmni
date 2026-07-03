@@ -360,6 +360,8 @@ export const ManageUsers: React.FC = () => {
   const [depositAmount, setDepositAmount] = useState<number>(0);
   const [depositNote, setDepositNote] = useState('شحن يدوي بالسنتر');
   const [depositing, setDepositing] = useState(false);
+  const [deviceManageTarget, setDeviceManageTarget] = useState<UserProfile | null>(null);
+  const [newMaxDevices, setNewMaxDevices] = useState<number>(2);
   const [allGroups, setAllGroups] = useState<any[]>([]);
   const [groupAssignTarget, setGroupAssignTarget] = useState<UserProfile | null>(null);
 
@@ -818,6 +820,57 @@ export const ManageUsers: React.FC = () => {
     }
   };
 
+  const handleMaxDevicesUpdate = async (uid: string, maxVal: number) => {
+    try {
+      await updateDoc(doc(db, 'users', uid), {
+        maxDevicesAllowed: maxVal,
+      });
+      setUsers(prev => prev.map(u => u.uid === uid ? { ...u, maxDevicesAllowed: maxVal } : u));
+      if (deviceManageTarget && deviceManageTarget.uid === uid) {
+        setDeviceManageTarget(prev => prev ? { ...prev, maxDevicesAllowed: maxVal } : null);
+      }
+      alert('تم تحديث الحد الأقصى للأجهزة بنجاح');
+    } catch (e: any) {
+      alert('حدث خطأ: ' + e.message);
+    }
+  };
+
+  const handleDeviceStatusUpdate = async (uid: string, deviceId: string, isBlocked: boolean) => {
+    try {
+      if (!deviceManageTarget) return;
+      const updatedDevices = (deviceManageTarget.devices || []).map((dev: any) => {
+        if (dev.id === deviceId) {
+          return { ...dev, isBlocked };
+        }
+        return dev;
+      });
+
+      await updateDoc(doc(db, 'users', uid), {
+        devices: updatedDevices,
+      });
+
+      setUsers(prev => prev.map(u => u.uid === uid ? { ...u, devices: updatedDevices } : u));
+      setDeviceManageTarget(prev => prev ? { ...prev, devices: updatedDevices } : null);
+      alert(isBlocked ? 'تم حظر الجهاز بنجاح' : 'تم فك حظر الجهاز بنجاح');
+    } catch (e: any) {
+      alert('حدث خطأ: ' + e.message);
+    }
+  };
+
+  const handleClearDevices = async (uid: string) => {
+    if (!confirm('هل أنت متأكد من رغبتك في حذف جميع الأجهزة المرتبطة بهذا الطالب؟ سيتمكن الطالب من الدخول من أجهزة جديدة.')) return;
+    try {
+      await updateDoc(doc(db, 'users', uid), {
+        devices: [],
+      });
+      setUsers(prev => prev.map(u => u.uid === uid ? { ...u, devices: [] } : u));
+      setDeviceManageTarget(prev => prev ? { ...prev, devices: [] } : null);
+      alert('تم حذف جميع الأجهزة بنجاح');
+    } catch (e: any) {
+      alert('حدث خطأ: ' + e.message);
+    }
+  };
+
   const handleSort = (field: SortField) => {
     if (sortField === field) setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     else {
@@ -1104,7 +1157,7 @@ export const ManageUsers: React.FC = () => {
                             setGradeEditTarget(u);
                             setNewLevel(u.level || '');
                           }}
-                          className="bg-white/5 border border-white/10 px-3 py-1 rounded-xl text-[10px] text-slate-400 hover:text-white transition-all"
+className="bg-white/5 border border-white/10 px-3 py-1 rounded-xl text-[10px] text-slate-400 hover:text-white transition-all"
                         >
                           {u.level || 'غير محدد'}
                         </button>
@@ -1153,6 +1206,19 @@ export const ManageUsers: React.FC = () => {
                           >
                             <Users size={18} />
                           </button>
+
+                          {u.role === 'student' && (
+                            <button
+                              onClick={() => {
+                                setDeviceManageTarget(u);
+                                setNewMaxDevices(u.maxDevicesAllowed || 2);
+                              }}
+                              className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all"
+                              title="إدارة الأجهزة"
+                            >
+                              <Smartphone size={18} />
+                            </button>
+                          )}
 
                           {u.studentType === 'center' && (
                             <>
@@ -1769,6 +1835,115 @@ export const ManageUsers: React.FC = () => {
               <button
                 onClick={() => setGroupAssignTarget(null)}
                 className="w-full mt-6 py-4 bg-white/5 text-slate-400 rounded-2xl font-black hover:text-white transition-all"
+              >
+                إغلاق
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {/* 📱 Device Management Modal */}
+        {deviceManageTarget && (
+          <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setDeviceManageTarget(null)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative bg-[#0d1425] border border-white/10 p-8 rounded-[2.5rem] shadow-2xl max-w-md w-full text-right overflow-hidden flex flex-col max-h-[90vh]"
+              dir="rtl"
+            >
+              <div className="w-16 h-16 bg-rose-500/10 text-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <Smartphone size={32} />
+              </div>
+              <h3 className="text-2xl font-black text-white mb-2 text-center">إدارة أجهزة الطالب</h3>
+              <p className="text-slate-400 text-sm mb-6 text-center">
+                اسم الطالب: <span className="text-white font-bold">{deviceManageTarget.displayName}</span>
+              </p>
+
+              {/* 🛠️ Max Devices Config */}
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-6">
+                <label className="block text-slate-400 text-xs font-bold mb-2">الحد الأقصى للأجهزة المسموح بها</label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={newMaxDevices}
+                    onChange={(e) => setNewMaxDevices(Math.max(1, Number(e.target.value)))}
+                    className="flex-1 bg-black/30 border border-white/10 p-3 rounded-xl text-white text-center font-bold text-lg"
+                  />
+                  <button
+                    onClick={() => handleMaxDevicesUpdate(deviceManageTarget.uid, newMaxDevices)}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 rounded-xl font-bold text-sm transition-all"
+                  >
+                    تحديث
+                  </button>
+                </div>
+              </div>
+
+              {/* 📱 Connected Devices List */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-white font-bold text-sm">الأجهزة المتصلة حالياً ({ (deviceManageTarget.devices || []).length })</h4>
+                  {(deviceManageTarget.devices || []).length > 0 && (
+                    <button
+                      onClick={() => handleClearDevices(deviceManageTarget.uid)}
+                      className="text-red-400 hover:text-red-300 text-xs font-bold flex items-center gap-1"
+                    >
+                      حذف جميع الأجهزة
+                    </button>
+                  )}
+                </div>
+
+                {(deviceManageTarget.devices || []).length === 0 ? (
+                  <p className="text-slate-500 text-xs text-center py-6">لا توجد أجهزة مرتبطة بهذا الحساب حالياً.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {(deviceManageTarget.devices || []).map((device: any, idx: number) => (
+                      <div key={device.id || idx} className="bg-black/30 border border-white/5 p-4 rounded-xl flex items-center justify-between text-right">
+                        <div className="space-y-1">
+                          <p className="text-white font-bold text-sm flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                            {device.name || 'جهاز غير معروف'}
+                          </p>
+                          <p className="text-[10px] text-slate-500 font-bold break-all">ID: {device.id}</p>
+                          <p className="text-[10px] text-slate-400 font-bold">آخر ظهور: {device.lastIp || 'N/A'} - {device.lastLogin ? new Date(device.lastLogin).toLocaleDateString('ar-EG') : 'N/A'}</p>
+                        </div>
+                        <div>
+                          {device.isBlocked ? (
+                            <button
+                              onClick={() => handleDeviceStatusUpdate(deviceManageTarget.uid, device.id, false)}
+                              className="px-3 py-1.5 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white rounded-lg text-xs font-bold transition-all"
+                            >
+                              فك الحظر
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleDeviceStatusUpdate(deviceManageTarget.uid, device.id, true)}
+                              className="px-3 py-1.5 bg-red-600/10 hover:bg-red-600 text-red-400 hover:text-white rounded-lg text-xs font-bold transition-all"
+                            >
+                              حظر الجهاز
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={() => setDeviceManageTarget(null)}
+                className="w-full py-4 bg-white/5 text-slate-400 rounded-2xl font-black hover:text-white transition-all text-center"
               >
                 إغلاق
               </button>

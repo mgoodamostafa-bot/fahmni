@@ -267,6 +267,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 await import('../lib/deviceFingerprint');
               const [f, ip] = await Promise.all([getFingerprint(), getPublicIP(4000)]);
               addLog(`Fingerprint: ${f}, IP: ${ip}`);
+              localStorage.setItem('fahmni_device_fingerprint', f);
               const dev = (docData.devices || []) as any[];
               const cur = dev.find((i) => i.id === f);
               const now = new Date().toISOString();
@@ -274,6 +275,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               if (docData.accountStatus === 'blocked') {
                 addLog("Student account is BLOCKED!");
                 setAccountBlocked(true);
+                return;
+              }
+
+              if (cur && cur.isBlocked === true) {
+                addLog("This specific device is BLOCKED!");
+                setDeviceLocked(true);
                 return;
               }
 

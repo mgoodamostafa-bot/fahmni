@@ -296,12 +296,17 @@ const AccountBlockedOverlay = () => {
 };
 
 const DeviceLockOverlay = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const handleLogout = async () => {
     const { signOut } = await import('firebase/auth');
     await signOut(getTenantAuth());
     window.location.reload();
   };
+
+  const fpId = localStorage.getItem('fahmni_device_fingerprint') || '';
+  const currentDevice = (profile?.devices || []).find((d: any) => d.id === fpId);
+  const isDeviceBlocked = currentDevice?.isBlocked === true;
+
   return (
     <div
       className="fixed inset-0 z-[9999] bg-[#0a0f1e] flex items-center justify-center p-6 text-right"
@@ -319,14 +324,20 @@ const DeviceLockOverlay = () => {
         <div className="w-24 h-24 bg-red-500/20 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-8">
           <ShieldAlert size={48} />
         </div>
-        <h1 className="text-3xl font-black text-white mb-6">عذراً، هذا الحساب مسجل على جهاز آخر</h1>
+        <h1 className="text-3xl font-black text-white mb-6">
+          {isDeviceBlocked ? 'عذراً، تم حظر هذا الجهاز من قبل الإدارة' : 'عذراً، هذا الحساب مسجل على جهاز آخر'}
+        </h1>
         <div className="bg-black/30 rounded-xl p-4 mb-6 border border-white/5 text-xs text-gray-400">
-          <p className="mb-2">برجاء مراجعة الإدارة وتزويدهم ببياناتك التالية لفتح الحظر:</p>
+          <p className="mb-2">
+            {isDeviceBlocked 
+              ? 'تم حظر جهازك الفردي من الوصول إلى هذه المنصة. يرجى التواصل مع الإدارة لفتح الحظر.' 
+              : 'برجاء مراجعة الإدارة وتزويدهم ببياناتك التالية لفتح الحظر:'}
+          </p>
           <p className="font-bold text-white mb-1">
             الحساب: <span className="text-brand-blue">{user?.email}</span>
           </p>
           <p className="text-[10px] break-all">
-            مُعرف هذا الجهاز: {localStorage.getItem('fahmni_device_fingerprint') || 'N/A'}
+            مُعرف هذا الجهاز: {fpId || 'N/A'}
           </p>
         </div>
         <button

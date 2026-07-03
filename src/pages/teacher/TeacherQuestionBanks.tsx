@@ -62,6 +62,9 @@ export const TeacherQuestionBanks: React.FC = () => {
 
   const [loading, setLoading] = useState(true);
   const [banks, setBanks] = useState<BankGroup[]>([]);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [selectedCourseTitle, setSelectedCourseTitle] = useState<string>('');
   const [search, setSearch] = useState('');
   const [selectedBank, setSelectedBank] = useState<BankGroup | null>(null);
   
@@ -81,7 +84,8 @@ export const TeacherQuestionBanks: React.FC = () => {
 
       const groups = new Map<string, BankGroup>();
       allQs.forEach((q) => {
-        const key = `${q.subject || 'عام'}_${q.chapter || 'بدون فصل'}`;
+        const courseId = q.courseId || 'general';
+        const key = `${courseId}_${q.chapter || 'بدون فصل'}`;
         if (!groups.has(key)) {
           groups.set(key, {
             id: key,
@@ -95,7 +99,18 @@ export const TeacherQuestionBanks: React.FC = () => {
         groups.get(key)!.questions.push(q);
       });
 
-      setBanks(Array.from(groups.values()));
+      const banksList = Array.from(groups.values());
+      setBanks(banksList);
+
+      // Sync active selectedBank if open
+      if (selectedBank) {
+        const updated = banksList.find((b) => b.id === selectedBank.id);
+        if (updated) {
+          setSelectedBank(updated);
+        } else {
+          setSelectedBank(null);
+        }
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -104,6 +119,25 @@ export const TeacherQuestionBanks: React.FC = () => {
   };
 
   useEffect(() => {
+    const fetchCourses = async () => {
+      if (!user?.uid) return;
+      try {
+        const qUpper = query(collection(db, 'Courses'), where('teacherId', '==', user.uid));
+        const qLower = query(collection(db, 'courses'), where('teacherId', '==', user.uid));
+        const [snapUpper, snapLower] = await Promise.all([getDocs(qUpper), getDocs(qLower)]);
+        const list: any[] = [];
+        snapUpper.docs.forEach(d => list.push({ id: d.id, ...d.data() }));
+        snapLower.docs.forEach(d => {
+          if (!list.find(item => item.id === d.id)) {
+            list.push({ id: d.id, ...d.data() });
+          }
+        });
+        setCourses(list);
+      } catch (err) {
+        console.error('Error fetching courses:', err);
+      }
+    };
+    fetchCourses();
     fetchBanks();
   }, [user]);
 
@@ -120,7 +154,7 @@ export const TeacherQuestionBanks: React.FC = () => {
 
     try {
       await deleteDoc(doc(db, 'Questions', qId));
-      // fetchBanks();
+      await fetchBanks();
       sendNotification({ type: 'success', title: 'تم الحذف', message: 'تم حذف السؤال بنجاح.' });
     } catch (err) {
       console.error(err);
@@ -145,7 +179,7 @@ export const TeacherQuestionBanks: React.FC = () => {
 
     try {
       await updateDoc(doc(db, 'Questions', id), data as any);
-      // fetchBanks();
+      await fetchBanks();
       sendNotification({
         type: 'success',
         title: 'تم التعديل',
@@ -172,7 +206,7 @@ export const TeacherQuestionBanks: React.FC = () => {
         batch.delete(doc(db, 'Questions', q.id));
       });
       await batch.commit();
-      // fetchBanks();
+      await fetchBanks();
       sendNotification({ type: 'success', title: 'تم حذف البنك', message: 'تم حذف جميع أسئلة البنك بنجاح.' });
     } catch (err) {
       console.error('Error deleting bank:', err);
@@ -205,7 +239,7 @@ export const TeacherQuestionBanks: React.FC = () => {
         });
       });
       await batch.commit();
-      // fetchBanks();
+      await fetchBanks();
       sendNotification({ type: 'success', title: 'تم تعديل البنك', message: 'تم تحديث تصنيف جميع أسئلة البنك بنجاح.' });
     } catch (err) {
       console.error('Error updating bank:', err);
@@ -255,6 +289,28 @@ export const TeacherQuestionBanks: React.FC = () => {
       b.subject.toLowerCase().includes(search.toLowerCase()) ||
       b.chapter.toLowerCase().includes(search.toLowerCase())
   );
+
+  // Group banks by course Folder
+  const courseFolderList = courses.map(c => {
+    const courseBanks = filteredBanks.filter(b => b.courseId === c.id);
+    return {
+      id: c.id,
+      title: c.title,
+      banksCount: courseBanks.length,
+      questionsCount: courseBanks.reduce((acc, b) => acc + b.questions.length, 0),
+    };
+  }).filter(folder => folder.banksCount > 0); // Only show folders that have banks!
+
+  // Also include general folder if there are general banks matching the search
+  const generalBanks = filteredBanks.filter(b => !b.courseId || !courses.find(c => c.id === b.courseId));
+  if (generalBanks.length > 0) {
+    courseFolderList.push({
+      id: 'general',
+      title: 'أسئلة عامة (غير مرتبطة بكورس)',
+      banksCount: generalBanks.length,
+      questionsCount: generalBanks.reduce((acc, b) => acc + b.questions.length, 0),
+    });
+  }
 
   if (loading) {
     return (
@@ -311,73 +367,142 @@ export const TeacherQuestionBanks: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {filteredBanks.length === 0 ? (
-              <div className="col-span-full py-24 text-center bg-[#0d1321]/50 border border-white/5 rounded-[3rem] backdrop-blur-sm">
+          {selectedCourseId === null ? (
+            // Course Folder Selection View
+            courseFolderList.length === 0 ? (
+              <div className="py-24 text-center bg-[#0d1321]/50 border border-white/5 rounded-[3rem] backdrop-blur-sm">
                 <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6">
                   <Folder className="text-gray-600 w-12 h-12" />
                 </div>
                 <h3 className="text-2xl font-black text-white mb-3">لا توجد بنوك أسئلة</h3>
-                <p className="text-gray-500 font-bold text-lg">لم تقم بإضافة أي أسئلة تتطابق مع بحثك حتى الآن.</p>
+                <p className="text-gray-500 font-bold text-lg">لم تقم بإضافة أي أسئلة أو بنوك بعد.</p>
               </div>
             ) : (
-              filteredBanks.map((bank) => (
-                <motion.div
-                  key={bank.id}
-                  whileHover={{ y: -5, scale: 1.01 }}
-                  className="group relative bg-[#0d1321]/80 backdrop-blur-xl border border-white/10 rounded-[2rem] p-6 transition-all shadow-xl hover:shadow-brand-blue/10 overflow-hidden cursor-pointer"
-                  onClick={() => setSelectedBank(bank)}
-                >
-                  {/* Decorative Gradient */}
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-brand-blue/5 blur-[50px] rounded-full group-hover:bg-brand-blue/10 transition-colors"></div>
-                  
-                  {/* Bank Actions */}
-                  <div className="absolute top-6 left-6 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setEditingBank(bank); }}
-                      className="p-2.5 bg-blue-500/10 text-brand-blue hover:bg-brand-blue hover:text-white rounded-xl transition-colors shadow-lg"
-                      title="تعديل بيانات البنك"
-                    >
-                      <Edit2 size={18} />
-                    </button>
-                    <button
-                      onClick={(e) => handleDeleteBank(bank, e)}
-                      className="p-2.5 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition-colors shadow-lg"
-                      title="حذف البنك بالكامل"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {courseFolderList.map((folder) => (
+                  <motion.div
+                    key={folder.id}
+                    whileHover={{ y: -5, scale: 1.02 }}
+                    onClick={() => {
+                      setSelectedCourseId(folder.id);
+                      setSelectedCourseTitle(folder.title);
+                    }}
+                    className="group relative bg-[#0d1321]/80 backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-8 transition-all shadow-xl hover:shadow-brand-blue/10 overflow-hidden cursor-pointer flex flex-col justify-between min-h-[220px]"
+                  >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-brand-blue/5 blur-[50px] rounded-full group-hover:bg-brand-blue/10 transition-colors"></div>
 
-                  <div className="relative z-10">
-                    <div className="flex justify-between items-start mb-6">
-                      <div className="p-4 bg-gradient-to-br from-brand-blue/20 to-blue-600/10 text-brand-blue rounded-2xl border border-brand-blue/20">
-                        <Folder size={28} className="group-hover:scale-110 transition-transform" />
+                    <div className="relative z-10 flex justify-between items-start">
+                      <div className="p-5 bg-gradient-to-br from-brand-blue/20 to-blue-600/10 text-brand-blue rounded-[1.5rem] border border-brand-blue/20">
+                        <Folder size={36} className="group-hover:scale-110 transition-transform text-brand-blue" />
                       </div>
-                      <div className="bg-black/40 border border-white/5 px-4 py-2 rounded-xl text-center">
+                      <div className="bg-black/40 border border-white/5 px-4 py-2.5 rounded-2xl text-center">
                         <span className="block text-2xl font-black text-white leading-none mb-1">
-                          {bank.questions.length}
+                          {folder.banksCount}
                         </span>
-                        <span className="block text-xs text-gray-500 font-bold">سؤال</span>
+                        <span className="block text-[10px] text-gray-500 font-black">بنك أسئلة</span>
                       </div>
                     </div>
 
-                    <h3 className="text-2xl font-black text-white mb-4 line-clamp-1 group-hover:text-brand-blue transition-colors">{bank.chapter}</h3>
-                    
-                    <div className="flex flex-wrap items-center gap-2 text-sm text-gray-300 font-bold">
-                      <span className="bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
-                        <BookOpen size={14} className="text-brand-blue" />
-                        {bank.subject}
-                      </span>
-                      <span className="bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl">
-                        {bank.grade}
-                      </span>
+                    <div className="relative z-10 mt-6 text-right">
+                      <h3 className="text-xl font-black text-white group-hover:text-brand-blue transition-colors line-clamp-2">
+                        {folder.title}
+                      </h3>
+                      <p className="text-xs text-gray-400 font-bold mt-2">
+                        إجمالي الأسئلة: {folder.questionsCount} سؤال
+                      </p>
                     </div>
-                  </div>
-                </motion.div>
-              ))
-            )}
-          </div>
+                  </motion.div>
+                ))}
+              </div>
+            )
+          ) : (
+            // Banks Inside Selected Course Folder View
+            <div className="space-y-6">
+              {/* Back Breadcrumb Header */}
+              <div className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-3xl p-4 md:px-6">
+                <button
+                  onClick={() => {
+                    setSelectedCourseId(null);
+                    setSelectedCourseTitle('');
+                  }}
+                  className="p-2.5 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-colors flex items-center justify-center text-gray-400 hover:text-white"
+                  title="العودة للمجلدات الرئيسية"
+                >
+                  <ChevronLeft size={20} className="rotate-180" />
+                </button>
+                <div className="text-right">
+                  <span className="text-[10px] text-gray-500 font-black block uppercase tracking-wider">مجلدات الكورسات</span>
+                  <h2 className="text-lg font-black text-white">{selectedCourseTitle}</h2>
+                </div>
+              </div>
+
+              {/* Grid of banks inside selected course folder */}
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {filteredBanks
+                  .filter(b => {
+                    if (selectedCourseId === 'general') {
+                      return !b.courseId || !courses.find(c => c.id === b.courseId);
+                    }
+                    return b.courseId === selectedCourseId;
+                  })
+                  .map((bank) => (
+                    <motion.div
+                      key={bank.id}
+                      whileHover={{ y: -5, scale: 1.01 }}
+                      className="group relative bg-[#0d1321]/80 backdrop-blur-xl border border-white/10 rounded-[2rem] p-6 transition-all shadow-xl hover:shadow-brand-blue/10 overflow-hidden cursor-pointer"
+                      onClick={() => setSelectedBank(bank)}
+                    >
+                      {/* Decorative Gradient */}
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-brand-blue/5 blur-[50px] rounded-full group-hover:bg-brand-blue/10 transition-colors"></div>
+                      
+                      {/* Bank Actions */}
+                      <div className="absolute top-6 left-6 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setEditingBank(bank); }}
+                          className="p-2.5 bg-blue-500/10 text-brand-blue hover:bg-brand-blue hover:text-white rounded-xl transition-colors shadow-lg"
+                          title="تعديل بيانات البنك"
+                        >
+                          <Edit2 size={18} />
+                        </button>
+                        <button
+                          onClick={(e) => handleDeleteBank(bank, e)}
+                          className="p-2.5 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition-colors shadow-lg"
+                          title="حذف البنك بالكامل"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+
+                      <div className="relative z-10">
+                        <div className="flex justify-between items-start mb-6">
+                          <div className="p-4 bg-gradient-to-br from-brand-blue/20 to-blue-600/10 text-brand-blue rounded-2xl border border-brand-blue/20">
+                            <Folder size={28} className="group-hover:scale-110 transition-transform" />
+                          </div>
+                          <div className="bg-black/40 border border-white/5 px-4 py-2 rounded-xl text-center">
+                            <span className="block text-2xl font-black text-white leading-none mb-1">
+                              {bank.questions.length}
+                            </span>
+                            <span className="block text-xs text-gray-500 font-bold">سؤال</span>
+                          </div>
+                        </div>
+
+                        <h3 className="text-2xl font-black text-white mb-4 line-clamp-1 group-hover:text-brand-blue transition-colors">{bank.chapter}</h3>
+                        
+                        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-300 font-bold">
+                          <span className="bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
+                            <BookOpen size={14} className="text-brand-blue" />
+                            {bank.subject}
+                          </span>
+                          <span className="bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl">
+                            {bank.grade}
+                          </span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+              </div>
+            </div>
+          )}
         </motion.div>
       ) : (
         <motion.div

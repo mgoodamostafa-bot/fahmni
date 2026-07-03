@@ -47,12 +47,14 @@ import {
   writeBatch,
   addDoc,
   serverTimestamp,
+  runTransaction,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, getTenantDb, storage } from '../lib/firebase';
 import { encryptUrl } from '../utils/crypto';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
+import { useTenant } from '../contexts/TenantContext';
 import { Quiz } from '../components/Quiz';
 import { CourseDiscussions } from '../components/CourseDiscussions';
 import { LessonSkeleton } from '../components/Skeleton';
@@ -65,6 +67,7 @@ interface Course {
   title: string;
   description: string;
   teacherId: string;
+  subject?: string;
 }
 
 interface Lesson {
@@ -78,10 +81,14 @@ interface Lesson {
   summary?: string;
   pdfUrl?: string;
   quiz?: any;
+  pdfPrice?: number;
+  examId?: string;
+  quizUrl?: string;
 }
 
 export const LessonView: React.FC = () => {
   const { settings } = useSettings();
+  const { tenantData } = useTenant();
   const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>();
   const { user, profile } = useAuth();
   const navigate = useNavigate();
@@ -89,6 +96,7 @@ export const LessonView: React.FC = () => {
   const [course, setCourse] = useState<Course | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
+  const currentLesson = activeLesson || lessons[0];
   const [loading, setLoading] = useState(true);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [enrollmentData, setEnrollmentData] = useState<any>(null);
@@ -100,6 +108,120 @@ export const LessonView: React.FC = () => {
     prev: null,
   });
   const [internalQuiz, setInternalQuiz] = useState<any>(null);
+  const [userQuizResult, setUserQuizResult] = useState<any>(null);
+  const [checkingQuizResult, setCheckingQuizResult] = useState(true);
+  const [isBookletPurchased, setIsBookletPurchased] = useState(false);
+  const [checkingBooklet, setCheckingBooklet] = useState(true);
+  const [buyingBooklet, setBuyingBooklet] = useState(false);
+
+  useEffect(() => {
+    const checkBookletPurchase = async () => {
+      if (!user || !currentLesson) {
+        setIsBookletPurchased(false);
+        setCheckingBooklet(false);
+        return;
+      }
+      setCheckingBooklet(true);
+      try {
+        const isFree = !(currentLesson.pdfPrice && Number(currentLesson.pdfPrice) > 0);
+        const hasAccess = profile?.role === 'teacher' || profile?.role === 'admin' || profile?.isOwner;
+        
+        if (isFree || hasAccess) {
+          setIsBookletPurchased(true);
+          setCheckingBooklet(false);
+          return;
+        }
+
+        const purchaseSnap = await getDoc(doc(db, 'booklet_purchases', `${user.uid}_${currentLesson.id}`));
+        setIsBookletPurchased(purchaseSnap.exists());
+      } catch (err) {
+        console.error('Error checking booklet purchase:', err);
+        setIsBookletPurchased(false);
+      } finally {
+        setCheckingBooklet(false);
+      }
+    };
+
+    checkBookletPurchase();
+  }, [user, currentLesson?.id, profile?.role]);
+
+  const handleBuyBooklet = async () => {
+    if (!user || !currentLesson || !course) return;
+    const price = Number(currentLesson.pdfPrice || 0);
+    if ((profile?.walletBalance || 0) < price) {
+      alert('رصيدك في المحفظة غير كافٍ لشراء هذه الملزمة. يرجى شحن محفظتك أولاً.');
+      return;
+    }
+
+    if (!confirm(`هل أنت متأكد من رغبتك في شراء ملزمة "${currentLesson.title}" بمبلغ ${price} ج.م من رصيد محفظتك؟`)) {
+      return;
+    }
+
+    setBuyingBooklet(true);
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const teacherRef = course.teacherId ? doc(db, 'users', course.teacherId) : null;
+      
+      await runTransaction(db, async (transaction) => {
+        const userSnap = await transaction.get(userRef);
+        if (!userSnap.exists()) throw new Error('مستند الطالب غير موجود');
+        const currentBalance = userSnap.data().walletBalance || 0;
+        if (currentBalance < price) throw new Error('رصيدك غير كافٍ');
+
+        let teacherSnap = null;
+        if (teacherRef) {
+          teacherSnap = await transaction.get(teacherRef);
+        }
+
+        transaction.update(userRef, { walletBalance: currentBalance - price });
+
+        if (teacherRef) {
+          const commissionPercent = teacherSnap?.exists() ? (teacherSnap.data().defaultCommission ?? 100) : 100;
+          const teacherShare = (price * Number(commissionPercent)) / 100;
+          transaction.set(teacherRef, {
+            totalEarnings: increment(teacherShare),
+            walletBalance: increment(teacherShare)
+          }, { merge: true });
+        }
+
+        const purchaseId = `${user.uid}_${currentLesson.id}`;
+        transaction.set(doc(db, 'booklet_purchases', purchaseId), {
+          userId: user.uid,
+          lessonId: currentLesson.id,
+          courseId: course.id,
+          price: price,
+          purchasedAt: serverTimestamp()
+        });
+
+        const tId = doc(collection(db, 'transactions')).id;
+        const commissionPercent = teacherSnap?.exists() ? (teacherSnap.data().defaultCommission ?? 100) : 100;
+        const teacherShare = (price * Number(commissionPercent)) / 100;
+        
+        transaction.set(doc(db, 'transactions', tId), {
+          userId: user.uid,
+          amount: -price,
+          type: 'booklet_purchase',
+          bookletName: currentLesson.title,
+          lessonId: currentLesson.id,
+          courseName: course.title,
+          courseId: course.id,
+          teacherId: course.teacherId || '',
+          teacherShare,
+          platformShare: price - teacherShare,
+          commissionPercentage: commissionPercent,
+          date: serverTimestamp()
+        });
+      });
+
+      alert('تم شراء الملزمة بنجاح!');
+      setIsBookletPurchased(true);
+    } catch (err: any) {
+      console.error('Error purchasing booklet:', err);
+      alert('حدث خطأ أثناء إتمام عملية الشراء: ' + err.message);
+    } finally {
+      setBuyingBooklet(false);
+    }
+  };
   const [homeworkLink, setHomeworkLink] = useState('');
   const [activationCode, setActivationCode] = useState('');
   const [showActivationPopup, setShowActivationPopup] = useState(false);
@@ -417,35 +539,122 @@ export const LessonView: React.FC = () => {
   );
 
   useEffect(() => {
-    const fetchQuiz = async (lId: string) => {
+    const fetchQuiz = async () => {
+      if (!currentLesson) {
+        setInternalQuiz(null);
+        setCheckingQuizResult(false);
+        return;
+      }
+      setCheckingQuizResult(true);
       try {
-        const q = query(collection(db, 'Quizzes'), where('lessonId', '==', lId));
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-          const quizData = snapshot.docs[0].data();
-          setInternalQuiz({
-            id: snapshot.docs[0].id,
-            title: 'اختبار الدرس',
-            questions: quizData.questions.map((q: any, idx: number) => ({
-              id: String(idx),
-              text: q.question,
-              options: q.options,
-              correctAnswer: q.correctIndex,
-            })),
-          });
+        let resolvedQuizId = '';
+        let fetchedQuiz = null;
+
+        // 1. Try Platform Exam associated via examId
+        if (currentLesson.examId) {
+          const examDoc = await getDoc(doc(db, 'exams', currentLesson.examId));
+          if (examDoc.exists()) {
+            const examData = examDoc.data();
+            resolvedQuizId = examDoc.id;
+            fetchedQuiz = {
+              id: examDoc.id,
+              title: examData.title || 'اختبار الدرس',
+              questions: (examData.questions || []).map((q: any, idx: number) => ({
+                id: q.id || String(idx),
+                text: q.questionText || q.question || '',
+                options: q.options || [],
+                correctAnswer: q.correctOptionIndex !== undefined ? q.correctOptionIndex : (q.correctIndex !== undefined ? q.correctIndex : 0),
+              })),
+            };
+          }
+        }
+
+        // 2. Fallback to lesson-specific quizzes collection (lowercase quizzes / uppercase Quizzes)
+        if (!fetchedQuiz) {
+          let quizSnap = await getDocs(query(collection(db, 'quizzes'), where('lessonId', '==', currentLesson.id)));
+          if (quizSnap.empty) {
+            quizSnap = await getDocs(query(collection(db, 'Quizzes'), where('lessonId', '==', currentLesson.id)));
+          }
+
+          if (!quizSnap.empty) {
+            const quizData = quizSnap.docs[0].data();
+            resolvedQuizId = quizSnap.docs[0].id;
+            fetchedQuiz = {
+              id: quizSnap.docs[0].id,
+              title: 'اختبار الدرس',
+              questions: (quizData.questions || []).map((q: any, idx: number) => ({
+                id: String(idx),
+                text: q.question || q.questionText || '',
+                options: q.options || [],
+                correctAnswer: q.correctIndex !== undefined ? q.correctIndex : (q.correctOptionIndex !== undefined ? q.correctOptionIndex : 0),
+              })),
+            };
+          }
+        }
+
+        setInternalQuiz(fetchedQuiz);
+
+        // Check if student has already completed this quiz
+        if (user && resolvedQuizId) {
+          const resultQuery = query(
+            collection(db, 'results'),
+            where('userId', '==', user.uid),
+            where('examId', '==', resolvedQuizId)
+          );
+          const resultSnap = await getDocs(resultQuery);
+          if (!resultSnap.empty) {
+            setUserQuizResult(resultSnap.docs[0].data());
+          } else {
+            setUserQuizResult(null);
+          }
         } else {
-          setInternalQuiz(null);
+          setUserQuizResult(null);
         }
       } catch (err) {
         console.error('Error fetching quiz:', err);
         setInternalQuiz(null);
+        setUserQuizResult(null);
+      } finally {
+        setCheckingQuizResult(false);
       }
     };
 
-    if (lessonId) {
-      fetchQuiz(lessonId);
+    fetchQuiz();
+  }, [currentLesson?.id, user]);
+
+  const handleQuizComplete = async (score: number) => {
+    if (!user || !internalQuiz || !course) return;
+    try {
+      const percentage = Math.round((score / internalQuiz.questions.length) * 100);
+      const level = percentage >= 85 ? 'ممتاز' : (percentage >= 75 ? 'جيد جداً' : (percentage >= 50 ? 'جيد' : 'ضعيف'));
+
+      const resultData = {
+        examId: internalQuiz.id,
+        examTitle: internalQuiz.title || 'اختبار الدرس',
+        subject: course.subject || '',
+        courseId: course.id,
+        teacherId: course.teacherId || '',
+        userId: user.uid,
+        studentId: user.uid,
+        studentName: profile?.displayName || user.email || 'طالب',
+        score: score,
+        totalCorrect: score,
+        totalQuestions: internalQuiz.questions.length,
+        percentage: percentage,
+        level: level,
+        timestamp: Date.now(),
+        type: 'online'
+      };
+
+      await addDoc(collection(db, 'results'), resultData);
+      
+      alert(`تهانينا! لقد أتممت الاختبار الدوري بنجاح. النتيجة: ${score} / ${internalQuiz.questions.length} (${percentage}%)`);
+      setUserQuizResult(resultData);
+    } catch (err: any) {
+      console.error('Error saving quiz result:', err);
+      alert('حدث خطأ أثناء حفظ نتيجة الاختبار: ' + err.message);
     }
-  }, [lessonId]);
+  };
 
   // Track progress and update Enrollment
   useEffect(() => {
@@ -776,8 +985,7 @@ export const LessonView: React.FC = () => {
     );
   }
 
-  const currentLesson = activeLesson || lessons[0];
-  const canWatch = isEnrolled || currentLesson.isFreePreview;
+  const canWatch = isEnrolled || currentLesson?.isFreePreview;
 
   return (
     <div className="min-h-screen bg-[#07090e] text-white font-display overflow-x-hidden relative" dir="rtl">
@@ -1111,42 +1319,153 @@ export const LessonView: React.FC = () => {
                           ملفات الشرح والملخصات
                         </h4>
                         {currentLesson.pdfUrl ? (
-                          <div className="bg-[#0c0f17] p-5 rounded-2xl border border-white/5 flex items-center justify-between group hover:border-white/10 transition-all">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
-                                <FileTypeIcon url={currentLesson.pdfUrl} size={18} />
-                              </div>
-                              <span className="font-bold text-sm text-gray-200">ملخص ومذكرة الحصة (PDF)</span>
+                          checkingBooklet ? (
+                            <div className="flex items-center justify-center py-8 gap-2 text-gray-400">
+                              <Loader2 size={18} className="animate-spin text-brand-blue" />
+                              <span className="text-xs font-bold">جاري التحقق من صلاحية الملف...</span>
                             </div>
-                            <a
-                              href={`/api/files/proxy?data=${encodeURIComponent(encryptUrl(currentLesson.pdfUrl))}&name=${encodeURIComponent(currentLesson.title + '.pdf')}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="p-3 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-xl transition-all shadow hover:scale-105 flex items-center justify-center"
-                            >
-                              <Download size={18} />
-                            </a>
-                          </div>
+                          ) : isBookletPurchased ? (
+                            <div className="bg-[#0c0f17] p-5 rounded-2xl border border-white/5 flex items-center justify-between group hover:border-white/10 transition-all">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                                  <FileTypeIcon url={currentLesson.pdfUrl} size={18} />
+                                </div>
+                                <span className="font-bold text-sm text-gray-200">ملخص ومذكرة الحصة (PDF)</span>
+                              </div>
+                              <a
+                                href={currentLesson.pdfUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-3 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-xl transition-all shadow hover:scale-105 flex items-center justify-center"
+                              >
+                                <Download size={18} />
+                              </a>
+                            </div>
+                          ) : (
+                            <div className="bg-white/5 border border-white/5 rounded-3xl p-6 text-center space-y-4 max-w-md mx-auto">
+                              <div className="w-16 h-16 bg-brand-yellow/10 text-brand-yellow rounded-2xl flex items-center justify-center mx-auto border border-brand-yellow/20">
+                                <FileText size={32} />
+                              </div>
+                              <div className="space-y-2">
+                                <h5 className="text-base font-black text-white">ملخص الحصة مدفوع</h5>
+                                <p className="text-gray-400 text-xs font-bold leading-normal">
+                                  مذكرة وملخص هذا الدرس غير مجانية. يمكنك إلغاء قفلها وتحميلها مباشرة باستخدام رصيد محفظتك.
+                                </p>
+                              </div>
+                              
+                              <div className="bg-black/30 rounded-2xl p-4 border border-white/5 flex items-center justify-between" dir="rtl">
+                                <div className="text-right">
+                                  <p className="text-[10px] text-gray-500 font-bold">سعر الملزمة</p>
+                                  <p className="text-lg font-black text-brand-yellow">
+                                    {(Number(currentLesson.pdfPrice || 0)).toLocaleString('ar-EG')} ج.م
+                                  </p>
+                                </div>
+                                <div className="text-left border-r border-white/10 pr-4">
+                                  <p className="text-[10px] text-gray-500 font-bold">رصيدك الحالي</p>
+                                  <p className="text-sm font-black text-white">
+                                    {(profile?.walletBalance || 0).toLocaleString('ar-EG')} ج.م
+                                  </p>
+                                </div>
+                              </div>
+
+                              <button
+                                disabled={buyingBooklet}
+                                onClick={handleBuyBooklet}
+                                className="w-full py-4 bg-brand-yellow hover:bg-yellow-500 disabled:opacity-50 text-space-950 rounded-2xl font-black text-sm transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                              >
+                                {buyingBooklet ? (
+                                  <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                  <span>شراء وتحميل الملزمة الآن</span>
+                                )}
+                              </button>
+
+                              {((profile?.walletBalance || 0) < Number(currentLesson.pdfPrice || 0)) && (tenantData?.whatsapp || settings?.whatsapp) && (
+                                <a
+                                  href={(() => {
+                                    const wa = tenantData?.whatsapp || settings?.whatsapp || '';
+                                    return wa.startsWith('http') ? wa : `https://wa.me/${wa.replace(/\+/g, '')}?text=${encodeURIComponent(`السلام عليكم، رصيدي غير كافٍ لشراء ملزمة درس "${currentLesson.title}"، أرغب في شحن محفظتي.`)}`;
+                                  })()}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="w-full py-4 bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] rounded-2xl font-black text-sm transition-all border border-[#25D366]/20 hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                                >
+                                  <MessageSquare size={16} />
+                                  <span>تواصل عبر واتساب لشحن الرصيد</span>
+                                </a>
+                              )}
+                            </div>
+                          )
                         ) : (
                           <p className="text-gray-500 text-xs italic">لا توجد ملفات مرفقة متاحة لهذه الحصة.</p>
                         )}
                       </div>
                     )}
 
-                    {activeTab === 'quiz' &&
-                      (internalQuiz ? (
+                    {activeTab === 'quiz' && (
+                      checkingQuizResult ? (
+                        <div className="flex flex-col items-center justify-center py-12 gap-2 text-gray-400">
+                          <Loader2 size={24} className="animate-spin text-brand-blue" />
+                          <span className="text-xs font-bold">جاري تحميل الاختبار والتحقق من النتيجة...</span>
+                        </div>
+                      ) : userQuizResult ? (
+                        <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center bg-white/5 rounded-3xl border border-white/5 max-w-md mx-auto my-6" dir="rtl">
+                          <div className="w-20 h-20 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center justify-center mb-6 border border-emerald-500/20">
+                            <Award size={40} />
+                          </div>
+                          <h3 className="text-2xl font-black text-white mb-2">لقد أديت هذا الاختبار سابقاً</h3>
+                          <p className="text-gray-400 text-xs font-bold mb-6">
+                            تم تسجيل وإرسال درجاتك في ملفك الأكاديمي وبوابة ولي الأمر بنجاح.
+                          </p>
+
+                          <div className="w-full bg-black/30 rounded-2xl p-4 border border-white/5 grid grid-cols-2 gap-4 text-right mb-6">
+                            <div>
+                              <p className="text-[10px] text-gray-500 font-bold">الدرجة المحققة</p>
+                              <p className="text-lg font-black text-emerald-400">
+                                {userQuizResult.totalCorrect ?? userQuizResult.score} / {userQuizResult.totalQuestions}
+                              </p>
+                            </div>
+                            <div className="border-r border-white/10 pr-4">
+                              <p className="text-[10px] text-gray-500 font-bold">النسبة المئوية</p>
+                              <p className="text-lg font-black text-white">
+                                {userQuizResult.percentage}%
+                              </p>
+                            </div>
+                          </div>
+
+                          <span className={`px-4 py-1.5 rounded-full text-xs font-black border ${
+                            (userQuizResult.percentage ?? 0) >= 50 
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                              : 'bg-red-500/10 text-red-400 border-red-500/20'
+                          }`}>
+                            {(userQuizResult.percentage ?? 0) >= 50 ? 'ناجح' : 'يحتاج لمراجعة'}
+                          </span>
+                        </div>
+                      ) : internalQuiz ? (
                         <Quiz
                           quiz={internalQuiz}
-                          onComplete={async () => {
-                            alert('تم تسليم درجات الاختبار الدوري بنجاح!');
-                          }}
+                          onComplete={handleQuizComplete}
                         />
+                      ) : currentLesson.quizUrl ? (
+                        <div className="text-center py-12 space-y-4">
+                          <HelpCircle size={32} className="mx-auto text-brand-blue opacity-80 animate-pulse" />
+                          <p className="text-sm font-bold text-gray-300">يوجد اختبار خارجي لهذه الحصة.</p>
+                          <a
+                            href={currentLesson.quizUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-6 py-3 bg-brand-blue hover:bg-blue-600 text-white rounded-xl font-bold text-sm transition-all shadow-lg hover:scale-105"
+                          >
+                            <span>بدء الاختبار الخارجي</span>
+                          </a>
+                        </div>
                       ) : (
                         <div className="text-center py-12 text-gray-500 space-y-2">
                           <HelpCircle size={32} className="mx-auto opacity-30" />
                           <p className="text-xs">لا يوجد اختبار مسند لهذه الحصة حالياً.</p>
                         </div>
-                      ))}
+                      )
+                    )}
 
                     {activeTab === 'homework' && (
                       <div className="space-y-6 py-4">

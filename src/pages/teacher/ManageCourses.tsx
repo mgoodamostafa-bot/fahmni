@@ -226,7 +226,11 @@ export const TeacherManageCourses: React.FC = () => {
                   <Key size={16} /> <span className="text-xs font-black">الأكواد</span>
                 </Link>
                 <button
-                  onClick={() => setCourseToDelete(course.id)}
+                  onClick={() => {
+                    if (window.confirm('هل أنت متأكد من حذف هذا الكورس بالكامل؟')) {
+                      handleDelete(course.id);
+                    }
+                  }}
                   className="flex items-center justify-center gap-2 p-3 bg-white/5 hover:bg-red-500/20 text-red-500 rounded-xl transition-all"
                 >
                   <Trash2 size={16} /> <span className="text-xs font-black">حذف</span>

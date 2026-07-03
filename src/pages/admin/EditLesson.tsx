@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, addDoc, collection, serverTimestamp, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { motion } from 'framer-motion';
 import {
@@ -32,12 +32,82 @@ export const EditLesson: React.FC = () => {
     videoUrl: '',
     pdfUrl: '',
     quizUrl: '',
+    examId: '',
+    pdfPrice: 0,
     summary: '',
     order: 1,
     isFreePreview: false,
     allowedViews: 5,
   });
   const [activeLessonColl, setActiveLessonColl] = useState<'Lessons' | 'lessons'>('Lessons');
+  const [quizType, setQuizType] = useState<'none' | 'internal' | 'bank' | 'external'>('none');
+  const [exams, setExams] = useState<any[]>([]);
+  const [bankQuestions, setBankQuestions] = useState<any[]>([]);
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedChapter, setSelectedChapter] = useState('');
+
+  useEffect(() => {
+    const fetchExams = async () => {
+      if (!user?.uid) return;
+      try {
+        const q = query(
+          collection(db, 'exams'),
+          where('teacherId', '==', user.uid)
+        );
+        const snapshot = await getDocs(q);
+        const list = snapshot.docs.map(d => ({
+          id: d.id,
+          title: d.data().title || 'امتحان بدون عنوان',
+        }));
+        setExams(list);
+      } catch (err) {
+        console.error('Error fetching exams:', err);
+      }
+    };
+    const fetchBankQuestions = async () => {
+      if (!user?.uid) return;
+      try {
+        const q = query(
+          collection(db, 'Questions'),
+          where('teacherId', '==', user.uid)
+        );
+        const snapshot = await getDocs(q);
+        const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        setBankQuestions(list);
+      } catch (err) {
+        console.error('Error fetching bank questions:', err);
+      }
+    };
+    fetchExams();
+    fetchBankQuestions();
+  }, [user]);
+
+  useEffect(() => {
+    if (isEditing && lessonId && bankQuestions.length > 0) {
+      const matchExistingQuiz = async () => {
+        try {
+          const quizSnap = await getDocs(query(collection(db, 'quizzes'), where('lessonId', '==', lessonId)));
+          if (!quizSnap.empty) {
+            const quizData = quizSnap.docs[0].data();
+            const existingQuizQuestions = quizData.questions || [];
+            const matchedIds: string[] = [];
+            existingQuizQuestions.forEach((eq: any) => {
+              const eqText = eq.question || eq.questionText || '';
+              const found = bankQuestions.find(bq => (bq.questionText || bq.question || '') === eqText);
+              if (found) {
+                matchedIds.push(found.id);
+              }
+            });
+            setSelectedQuestionIds(matchedIds);
+          }
+        } catch (error) {
+          console.error('Error matching existing quiz:', error);
+        }
+      };
+      matchExistingQuiz();
+    }
+  }, [bankQuestions, lessonId, isEditing]);
 
   useEffect(() => {
     if (isEditing && lessonId) {
@@ -53,11 +123,25 @@ export const EditLesson: React.FC = () => {
 
           if (docSnap.exists()) {
             const data = docSnap.data();
+            let type: 'none' | 'internal' | 'bank' | 'external' = 'none';
+            if (data.examId) {
+              type = 'internal';
+            } else if (data.quizUrl) {
+              type = 'external';
+            } else {
+              const quizSnap = await getDocs(query(collection(db, 'quizzes'), where('lessonId', '==', lessonId)));
+              if (!quizSnap.empty) {
+                type = 'bank';
+              }
+            }
+            setQuizType(type);
             setFormData({
               title: data.title || '',
               videoUrl: data.videoUrl || '',
               pdfUrl: data.pdfUrl || '',
               quizUrl: data.quizUrl || '',
+              examId: data.examId || '',
+              pdfPrice: data.pdfPrice || 0,
               summary: data.summary || '',
               order: data.order || 1,
               isFreePreview: data.isFreePreview || false,
@@ -79,19 +163,42 @@ export const EditLesson: React.FC = () => {
     e.preventDefault();
     setSaving(true);
     try {
+      let finalExamId = formData.examId;
+      let finalQuizUrl = formData.quizUrl;
+
+      if (quizType === 'none') {
+        finalExamId = '';
+        finalQuizUrl = '';
+      } else if (quizType === 'internal') {
+        finalQuizUrl = '';
+      } else if (quizType === 'bank') {
+        finalExamId = '';
+        finalQuizUrl = '';
+      } else if (quizType === 'external') {
+        finalExamId = '';
+      }
+
+      const lessonData = {
+        ...formData,
+        examId: finalExamId,
+        quizUrl: finalQuizUrl,
+      };
+
+      let resolvedLessonId = lessonId;
+
       if (isEditing && lessonId) {
         await updateDoc(doc(db, activeLessonColl, lessonId), {
-          ...formData,
+          ...lessonData,
           updatedAt: serverTimestamp(),
         });
       } else if (courseId) {
-        // For new ones, we can default to 'Lessons' (Upper)
-        await addDoc(collection(db, 'Lessons'), {
-          ...formData,
+        const docRef = await addDoc(collection(db, 'Lessons'), {
+          ...lessonData,
           courseId,
           teacherId: user?.uid,
           createdAt: serverTimestamp(),
         });
+        resolvedLessonId = docRef.id;
 
         // Notify enrolled students
         await sendNotification({
@@ -104,11 +211,43 @@ export const EditLesson: React.FC = () => {
           senderName: profile?.displayName || 'المدرس',
         });
       }
+
+      // Handle quizzes collection updates/creation based on quizType
+      if (resolvedLessonId) {
+        const quizzesColl = collection(db, 'quizzes');
+        const qSnap = await getDocs(query(quizzesColl, where('lessonId', '==', resolvedLessonId)));
+        
+        if (quizType === 'bank') {
+          const selectedQuestions = bankQuestions.filter(bq => selectedQuestionIds.includes(bq.id));
+          const mappedQuestions = selectedQuestions.map(q => ({
+            question: q.questionText || q.question || '',
+            options: q.options || [],
+            correctIndex: q.correctOptionIndex !== undefined ? q.correctOptionIndex : (q.correctIndex !== undefined ? q.correctIndex : 0)
+          }));
+
+          if (!qSnap.empty) {
+            await updateDoc(doc(db, 'quizzes', qSnap.docs[0].id), {
+              questions: mappedQuestions
+            });
+          } else {
+            await addDoc(quizzesColl, {
+              lessonId: resolvedLessonId,
+              questions: mappedQuestions
+            });
+          }
+        } else {
+          // If type is not bank, remove any quizzes document associated with this lesson to avoid conflicts
+          if (!qSnap.empty) {
+            await deleteDoc(doc(db, 'quizzes', qSnap.docs[0].id));
+          }
+        }
+      }
+
       alert('تم حفظ البيانات بنجاح!');
       navigate(-1);
     } catch (error) {
       console.error('Error saving lesson:', error);
-      alert('حدث خطأ أثناء حفظ البيانات');
+      alert('حدث خطأ أثناء حفظ الدرس');
     } finally {
       setSaving(false);
     }
@@ -206,21 +345,163 @@ export const EditLesson: React.FC = () => {
                 type="url"
                 value={formData.pdfUrl}
                 onChange={(e) => setFormData({ ...formData, pdfUrl: e.target.value })}
-                className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:outline-none focus:border-brand-blue transition-colors"
+                className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:outline-none focus:border-brand-blue transition-colors text-left"
+                dir="ltr"
               />
             </div>
 
             <div className="space-y-4">
               <label className="text-gray-400 font-bold flex items-center gap-2">
-                <HelpCircle className="text-purple-500" size={18} />
-                رابط الاختبار (Quiz)
+                <FileText className="text-brand-yellow" size={18} />
+                سعر الملزمة (0 يعني مجانية)
               </label>
               <input
-                type="url"
-                value={formData.quizUrl}
-                onChange={(e) => setFormData({ ...formData, quizUrl: e.target.value })}
-                className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:outline-none focus:border-brand-blue transition-colors"
+                type="number"
+                min="0"
+                value={formData.pdfPrice}
+                onChange={(e) => setFormData({ ...formData, pdfPrice: Math.max(0, Number(e.target.value)) })}
+                className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:outline-none focus:border-brand-blue transition-colors text-left"
+                dir="ltr"
               />
+            </div>
+          </div>
+
+          <div className="space-y-4 bg-white/5 p-6 rounded-[2rem] border border-white/5">
+            <label className="text-gray-200 font-black flex items-center gap-2 text-base">
+              <HelpCircle className="text-purple-500" size={20} />
+              الاختبار الدوري للدرس
+            </label>
+            
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-gray-400 font-bold text-xs">مصدر الاختبار</label>
+                <select
+                  value={quizType}
+                  onChange={(e) => {
+                    const val = e.target.value as 'none' | 'internal' | 'bank' | 'external';
+                    setQuizType(val);
+                    if (val === 'none') {
+                      setFormData(prev => ({ ...prev, examId: '', quizUrl: '' }));
+                    } else if (val === 'internal') {
+                      setFormData(prev => ({ ...prev, quizUrl: '' }));
+                    } else if (val === 'bank') {
+                      setFormData(prev => ({ ...prev, examId: '', quizUrl: '' }));
+                    } else {
+                      setFormData(prev => ({ ...prev, examId: '' }));
+                    }
+                  }}
+                  className="w-full bg-[#0a0f1c] border border-white/10 rounded-2xl p-4 text-white focus:outline-none focus:border-brand-blue"
+                >
+                  <option value="none">بدون اختبار</option>
+                  <option value="internal">اختبار تفاعلي من المنصة (اختر امتحان جاهز)</option>
+                  <option value="bank">تحديد أسئلة مخصصة من بنك الأسئلة</option>
+                  <option value="external">رابط اختبار خارجي (مثال: Google Forms)</option>
+                </select>
+              </div>
+
+              {quizType === 'internal' && (
+                <div className="space-y-2">
+                  <label className="text-gray-400 font-bold text-xs">اختر الامتحان من المنصة</label>
+                  <select
+                    value={formData.examId}
+                    onChange={(e) => setFormData(prev => ({ ...prev, examId: e.target.value }))}
+                    className="w-full bg-[#0a0f1c] border border-white/10 rounded-2xl p-4 text-white focus:outline-none focus:border-brand-blue"
+                  >
+                    <option value="">-- اختر الامتحان --</option>
+                    {exams.map(ex => (
+                      <option key={ex.id} value={ex.id}>{ex.title}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {quizType === 'external' && (
+                <div className="space-y-2">
+                  <label className="text-gray-400 font-bold text-xs">رابط الاختبار الخارجي</label>
+                  <input
+                    type="url"
+                    value={formData.quizUrl}
+                    onChange={(e) => setFormData(prev => ({ ...prev, quizUrl: e.target.value }))}
+                    className="w-full bg-[#0a0f1c] border border-white/10 rounded-2xl p-4 text-white focus:outline-none focus:border-brand-blue text-left"
+                    dir="ltr"
+                    placeholder="https://docs.google.com/forms/..."
+                  />
+                </div>
+              )}
+
+              {quizType === 'bank' && (
+                <div className="space-y-4 col-span-2">
+                  <label className="text-gray-400 font-bold text-xs">تحديد الأسئلة من بنك الأسئلة ({selectedQuestionIds.length} محددة)</label>
+                  
+                  {/* Search and Filter */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <input
+                      type="text"
+                      placeholder="بحث في نص السؤال..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="bg-[#0a0f1c] border border-white/10 rounded-2xl p-3 text-white focus:outline-none focus:border-brand-blue text-sm"
+                    />
+                    <select
+                      value={selectedChapter}
+                      onChange={(e) => setSelectedChapter(e.target.value)}
+                      className="bg-[#0a0f1c] border border-white/10 rounded-2xl p-3 text-white focus:outline-none focus:border-brand-blue text-sm"
+                    >
+                      <option value="">جميع الفصول / الأبواب</option>
+                      {Array.from(new Set(bankQuestions.map(bq => bq.chapter).filter(Boolean))).map((ch: any) => (
+                        <option key={ch} value={ch}>{ch}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Questions List */}
+                  <div className="max-h-[300px] overflow-y-auto border border-white/10 rounded-2xl divide-y divide-white/5 bg-black/20 p-2">
+                    {bankQuestions
+                      .filter(bq => {
+                        const matchText = (bq.questionText || bq.question || '').toLowerCase().includes(searchQuery.toLowerCase());
+                        const matchChapter = !selectedChapter || bq.chapter === selectedChapter;
+                        return matchText && matchChapter;
+                      })
+                      .map(bq => {
+                        const isChecked = selectedQuestionIds.includes(bq.id);
+                        return (
+                          <div
+                            key={bq.id}
+                            onClick={() => {
+                              setSelectedQuestionIds(prev => 
+                                isChecked ? prev.filter(id => id !== bq.id) : [...prev, bq.id]
+                              );
+                            }}
+                            className={`flex items-start gap-4 p-4 cursor-pointer hover:bg-white/[0.02] transition-colors rounded-xl ${isChecked ? 'bg-brand-blue/5' : ''}`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              readOnly
+                              className="mt-1 accent-brand-blue cursor-pointer"
+                            />
+                            <div className="flex-1 text-right">
+                              <p className="font-bold text-sm text-white">{bq.questionText || bq.question}</p>
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                {bq.chapter && (
+                                  <span className="text-[10px] bg-white/5 border border-white/10 text-gray-400 px-2 py-0.5 rounded">
+                                    الفصل: {bq.chapter}
+                                  </span>
+                                )}
+                                <span className="text-[10px] bg-brand-blue/10 text-brand-blue px-2 py-0.5 rounded">
+                                  {bq.difficulty === 'easy' ? 'سهل' : (bq.difficulty === 'hard' ? 'صعب' : 'متوسط')}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    {bankQuestions.length === 0 && (
+                      <p className="text-gray-500 text-xs text-center py-8 italic">لا توجد أسئلة في بنك الأسئلة الخاص بك حالياً.</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

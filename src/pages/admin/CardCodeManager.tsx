@@ -35,6 +35,7 @@ import {
   Filter,
   Search,
   CheckCircle,
+  ExternalLink,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -68,7 +69,7 @@ export const CardCodeManager: React.FC = () => {
   const [count, setCount] = useState(10);
   const [chargeValue, setChargeValue] = useState(100);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<any | null>(null);
 
   // Tabs: 'course' | 'charge'
   const [activeTab, setActiveTab] = useState<'course' | 'charge'>('course');
@@ -184,26 +185,67 @@ export const CardCodeManager: React.FC = () => {
         q = query(collection(db, 'codes'), ...constraints, limit(PAGE_SIZE));
       }
 
-      const snapshot = await getDocs(q);
-      const fetched = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) } as CardCode));
+      let snapshot;
+      try {
+        snapshot = await getDocs(q);
+        const fetched = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) } as CardCode));
 
-      if (fetched.length > 0) {
-        setFirstVisibleDoc(snapshot.docs[0]);
-        setLastVisibleDoc(snapshot.docs[snapshot.docs.length - 1]);
-        setCodes(fetched);
+        if (fetched.length > 0) {
+          setFirstVisibleDoc(snapshot.docs[0]);
+          setLastVisibleDoc(snapshot.docs[snapshot.docs.length - 1]);
+          setCodes(fetched);
 
-        // Check if there's a next page
-        const nextQuery = query(
-          collection(db, 'codes'),
-          ...constraints,
-          startAfter(snapshot.docs[snapshot.docs.length - 1]),
-          limit(1)
-        );
-        const nextSnap = await getDocs(nextQuery);
-        setHasNextPage(!nextSnap.empty);
-      } else {
-        setCodes([]);
-        setHasNextPage(false);
+          // Check if there's a next page
+          const nextQuery = query(
+            collection(db, 'codes'),
+            ...constraints,
+            startAfter(snapshot.docs[snapshot.docs.length - 1]),
+            limit(1)
+          );
+          const nextSnap = await getDocs(nextQuery);
+          setHasNextPage(!nextSnap.empty);
+        } else {
+          setCodes([]);
+          setHasNextPage(false);
+        }
+      } catch (queryErr: any) {
+        if (queryErr.message?.includes('requires an index') || queryErr.message?.includes('index')) {
+          console.warn("Missing index, falling back to client-side filtering...", queryErr);
+          const cleanConstraints: any[] = [orderBy('createdAt', 'desc')];
+          if (profile?.role !== 'admin') {
+            cleanConstraints.push(where('teacherId', '==', user?.uid));
+          }
+          if (!searchQuery.trim()) {
+            cleanConstraints.push(where('type', '==', activeTab));
+          }
+          const fallbackQuery = query(collection(db, 'codes'), ...cleanConstraints, limit(200));
+          const fallbackSnap = await getDocs(fallbackQuery);
+          let fetched = fallbackSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) } as CardCode));
+
+          if (filterStatus === 'available') {
+            fetched = fetched.filter(c => c.isUsed === false);
+          } else if (filterStatus === 'used') {
+            fetched = fetched.filter(c => c.isUsed === true);
+          }
+
+          const sliced = fetched.slice(0, PAGE_SIZE);
+          setCodes(sliced);
+          setHasNextPage(fetched.length > PAGE_SIZE);
+          setHasPrevPage(false);
+          setCurrentPage(1);
+          setLoading(false);
+
+          const indexUrl = queryErr.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/)?.[0];
+          if (indexUrl) {
+            setError({
+              message: 'لتسريع تصفية الأكواد، يرجى تفعيل الفهرس بالضغط على الزر أدناه:',
+              url: indexUrl
+            });
+          }
+          return;
+        } else {
+          throw queryErr;
+        }
       }
 
       if (direction === 'first') {
@@ -468,9 +510,22 @@ export const CardCodeManager: React.FC = () => {
               </div>
 
               {error && (
-                <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-xl flex items-center gap-3 text-sm font-bold">
-                  <AlertCircle size={18} />
-                  {error}
+                <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-xl flex flex-col gap-3 text-sm font-bold text-right" dir="rtl">
+                  <div className="flex items-center gap-3">
+                    <AlertCircle size={18} className="shrink-0" />
+                    <span>{typeof error === 'object' ? error.message : error}</span>
+                  </div>
+                  {typeof error === 'object' && error.url && (
+                    <a
+                      href={error.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs transition-all shadow self-start"
+                    >
+                      <ExternalLink size={14} />
+                      <span>تفعيل ميزة التصفية بالسنتر (إنشاء الفهرس)</span>
+                    </a>
+                  )}
                 </div>
               )}
 
