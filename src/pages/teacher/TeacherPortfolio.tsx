@@ -56,8 +56,37 @@ export const TeacherPortfolio: React.FC = () => {
   const fetchResources = async () => {
     if (!user) return;
     try {
-      const fetchedResources = await smartGetDocs('PortfolioResources');
-      setResources(fetchedResources);
+      const [portfolioSnap, lessonsSnap, coursesSnap] = await Promise.all([
+        smartGetDocs('PortfolioResources'),
+        smartGetDocs('Lessons'),
+        smartGetDocs('Courses')
+      ]);
+
+      const courseMap = new Map();
+      coursesSnap.forEach((c) => courseMap.set(c.id, c));
+
+      const combined = [
+        ...portfolioSnap.map(d => ({ 
+          ...d, 
+          _isLesson: false,
+          courseTitle: d.courseTitle || courseMap.get(d.courseId)?.title || 'كورس غير معروف',
+          subject: d.subject || courseMap.get(d.courseId)?.subject || 'عام'
+        })),
+        ...lessonsSnap.filter(d => d.pdfUrl).map(d => ({ 
+          ...d, 
+          _isLesson: true,
+          courseTitle: d.courseTitle || courseMap.get(d.courseId)?.title || 'كورس غير معروف',
+          subject: d.subject || courseMap.get(d.courseId)?.subject || 'عام'
+        }))
+      ];
+
+      combined.sort((a: any, b: any) => {
+        const timeA = a.createdAt?.seconds || 0;
+        const timeB = b.createdAt?.seconds || 0;
+        return timeB - timeA;
+      });
+
+      setResources(combined);
     } catch (err) {
       console.error(err);
     } finally {
@@ -279,12 +308,14 @@ export const TeacherPortfolio: React.FC = () => {
               animate={{ scale: 1, opacity: 1 }}
               className="bg-white/5 border border-white/10 rounded-2xl p-6 relative group hover:border-emerald-500/30 transition-all shadow-lg"
             >
-              <button
-                onClick={() => handleDelete(res.id)}
-                className="absolute top-4 left-4 p-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-              >
-                <Trash2 size={16} />
-              </button>
+              {!res._isLesson && (
+                <button
+                  onClick={() => handleDelete(res.id)}
+                  className="absolute top-4 left-4 p-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
 
               <div className="w-12 h-12 bg-emerald-500/10 text-emerald-500 rounded-xl flex items-center justify-center mb-4">
                 <FileText size={24} />
