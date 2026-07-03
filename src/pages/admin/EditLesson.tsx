@@ -52,8 +52,7 @@ export const EditLesson: React.FC = () => {
       if (!user?.uid) return;
       try {
         const q = query(
-          collection(db, 'exams'),
-          where('teacherId', '==', user.uid)
+          collection(db, 'exams')
         );
         const snapshot = await getDocs(q);
         const list = snapshot.docs.map(d => ({
@@ -69,8 +68,7 @@ export const EditLesson: React.FC = () => {
       if (!user?.uid) return;
       try {
         const q = query(
-          collection(db, 'Questions'),
-          where('teacherId', '==', user.uid)
+          collection(db, 'Questions')
         );
         const snapshot = await getDocs(q);
         const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));

@@ -108,8 +108,8 @@ export const CouponManager: React.FC = () => {
           coursesList = Array.from(uniqueMap.values());
         } else if (profile?.role === 'teacher') {
           const [upperSnap, lowerSnap] = await Promise.all([
-            getDocs(query(collection(db, 'Courses'), where('teacherId', '==', user.uid))),
-            getDocs(query(collection(db, 'courses'), where('teacherId', '==', user.uid))),
+            getDocs(collection(db, 'Courses')),
+            getDocs(collection(db, 'courses')),
           ]);
           const combined = [
             ...upperSnap.docs.map(d => ({ id: d.id, ...d.data() })),
@@ -132,7 +132,7 @@ export const CouponManager: React.FC = () => {
 
         // Real-time listener for coupons
         let couponsQuery;
-        if (profile?.role === 'admin') {
+        if (profile?.role === 'admin' || profile?.role === 'teacher') {
           couponsQuery = collection(db, 'coupons');
         } else {
           couponsQuery = query(collection(db, 'coupons'), where('teacherId', '==', user.uid));

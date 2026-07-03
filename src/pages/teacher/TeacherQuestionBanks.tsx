@@ -78,7 +78,7 @@ export const TeacherQuestionBanks: React.FC = () => {
   const fetchBanks = async () => {
     if (!user) return;
     try {
-      const q = query(collection(db, 'Questions'), where('teacherId', '==', user.uid));
+      const q = query(collection(db, 'Questions'));
       const snap = await getDocs(q);
       const allQs = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Question);
 
@@ -122,8 +122,8 @@ export const TeacherQuestionBanks: React.FC = () => {
     const fetchCourses = async () => {
       if (!user?.uid) return;
       try {
-        const qUpper = query(collection(db, 'Courses'), where('teacherId', '==', user.uid));
-        const qLower = query(collection(db, 'courses'), where('teacherId', '==', user.uid));
+        const qUpper = query(collection(db, 'Courses'));
+        const qLower = query(collection(db, 'courses'));
         const [snapUpper, snapLower] = await Promise.all([getDocs(qUpper), getDocs(qLower)]);
         const list: any[] = [];
         snapUpper.docs.forEach(d => list.push({ id: d.id, ...d.data() }));

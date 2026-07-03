@@ -45,7 +45,7 @@ export const TeacherPortfolio: React.FC = () => {
   const fetchCourses = async () => {
     if (!user) return;
     try {
-      const q = query(collection(db, 'Courses'), where('teacherId', '==', user.uid));
+      const q = query(collection(db, 'Courses'));
       const snap = await getDocs(q);
       const fetchedCourses = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setCourses(fetchedCourses);
@@ -57,7 +57,7 @@ export const TeacherPortfolio: React.FC = () => {
   const fetchResources = async () => {
     if (!user) return;
     try {
-      const q = query(collection(db, 'PortfolioResources'), where('teacherId', '==', user.uid));
+      const q = query(collection(db, 'PortfolioResources'));
       const snap = await getDocs(q);
       setResources(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     } catch (err) {

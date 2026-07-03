@@ -127,7 +127,6 @@ export const HomeworkSubmissions: React.FC = () => {
     // Fetch all submissions for this teacher
     const q = query(
       collection(db, 'submissions'),
-      where('teacherId', '==', user.uid),
       orderBy('submittedAt', 'desc')
     );
 

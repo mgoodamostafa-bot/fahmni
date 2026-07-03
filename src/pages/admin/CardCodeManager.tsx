@@ -155,7 +155,7 @@ export const CardCodeManager: React.FC = () => {
       let constraints: any[] = [orderBy('createdAt', 'desc')];
 
       // Add teacher filters
-      if (profile?.role !== 'admin') {
+      if (profile?.role !== 'admin' && profile?.role !== 'teacher') {
         constraints.push(where('teacherId', '==', user?.uid));
       }
 
@@ -212,7 +212,7 @@ export const CardCodeManager: React.FC = () => {
         if (queryErr.message?.includes('requires an index') || queryErr.message?.includes('index')) {
           console.warn("Missing index, falling back to client-side filtering...", queryErr);
           const cleanConstraints: any[] = [orderBy('createdAt', 'desc')];
-          if (profile?.role !== 'admin') {
+          if (profile?.role !== 'admin' && profile?.role !== 'teacher') {
             cleanConstraints.push(where('teacherId', '==', user?.uid));
           }
           if (!searchQuery.trim()) {

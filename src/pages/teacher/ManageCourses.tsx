@@ -36,8 +36,8 @@ export const TeacherManageCourses: React.FC = () => {
   const fetchCourses = async () => {
     if (!user) return;
     try {
-      const qUpper = query(collection(db, 'Courses'), where('teacherId', '==', user.uid));
-      const qLower = query(collection(db, 'courses'), where('teacherId', '==', user.uid));
+      const qUpper = query(collection(db, 'Courses'));
+      const qLower = query(collection(db, 'courses'));
 
       const [snapUpper, snapLower] = await Promise.all([getDocs(qUpper), getDocs(qLower)]);
 

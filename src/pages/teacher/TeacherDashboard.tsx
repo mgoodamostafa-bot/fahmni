@@ -73,8 +73,8 @@ export const TeacherDashboard: React.FC = () => {
       try {
         // 1. Get Courses (Dual Case)
         const [qUp, qLo] = await Promise.all([
-          getDocs(query(collection(db, 'Courses'), where('teacherId', '==', user.uid))),
-          getDocs(query(collection(db, 'courses'), where('teacherId', '==', user.uid))),
+          getDocs(collection(db, 'Courses')),
+          getDocs(collection(db, 'courses')),
         ]);
 
         const allCourses = [...qUp.docs, ...qLo.docs].map((d) => ({
@@ -219,8 +219,8 @@ export const TeacherDashboard: React.FC = () => {
 
         // 4. Submissions
         const [sub1, sub2] = await Promise.all([
-          getDocs(query(collection(db, 'submissions'), where('teacherId', '==', user.uid))),
-          getDocs(query(collection(db, 'Submissions'), where('teacherId', '==', user.uid))),
+          getDocs(collection(db, 'submissions')),
+          getDocs(collection(db, 'Submissions')),
         ]);
         const totalSubmissions = new Set([
           ...sub1.docs.map((d) => d.id),
