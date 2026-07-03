@@ -10,7 +10,7 @@ import {
   DocumentData,
   QuerySnapshot,
 } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { getTenantDb } from '../lib/firebase';
 
 /**
  * Queries a Firestore collection, trying lowercase first, then falling back to uppercase.
@@ -46,7 +46,7 @@ async function queryCollection(
   name: string,
   constraints: QueryConstraint[]
 ): Promise<DocumentData[]> {
-  const snap = await getDocs(query(collection(db, name), ...constraints));
+  const snap = await getDocs(query(collection(getTenantDb(), name), ...constraints));
   return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 }
 
@@ -61,13 +61,13 @@ export async function smartGetDoc(
   const upper = collectionName.charAt(0).toUpperCase() + collectionName.slice(1);
 
   try {
-    const docRefLower = doc(db, lower, docId);
+    const docRefLower = doc(getTenantDb(), lower, docId);
     const snapLower = await getDoc(docRefLower);
     if (snapLower.exists()) {
       return { id: snapLower.id, ...snapLower.data() };
     }
     if (lower !== upper) {
-      const docRefUpper = doc(db, upper, docId);
+      const docRefUpper = doc(getTenantDb(), upper, docId);
       const snapUpper = await getDoc(docRefUpper);
       if (snapUpper.exists()) {
         return { id: snapUpper.id, ...snapUpper.data() };
@@ -91,13 +91,13 @@ export async function smartCount(
 
   try {
     if (lower === upper) {
-      const q = query(collection(db, lower), ...constraints);
+      const q = query(collection(getTenantDb(), lower), ...constraints);
       const snap = await getCountFromServer(q);
       return snap.data().count;
     }
     const [lowerCount, upperCount] = await Promise.allSettled([
-      getCountFromServer(query(collection(db, lower), ...constraints)),
-      getCountFromServer(query(collection(db, upper), ...constraints)),
+      getCountFromServer(query(collection(getTenantDb(), lower), ...constraints)),
+      getCountFromServer(query(collection(getTenantDb(), upper), ...constraints)),
     ]);
     let count = 0;
     if (lowerCount.status === 'fulfilled') count += lowerCount.value.data().count;
