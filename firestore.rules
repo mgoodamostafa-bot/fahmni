@@ -1,0 +1,239 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper Functions ──────────────────────────────────────
+    function isAuth() { return request.auth != null; }
+    function isOwner(uid) { return request.auth.uid == uid; }
+    function isAdminOrTeacher() {
+      let profile = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return profile.data.role == 'admin' || profile.data.role == 'teacher';
+    }
+
+    function isAdmin() {
+      let profile = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return profile.data.role == 'admin';
+    }
+
+    // ─── Site Settings & Public Config ────────────────────────
+    match /siteSettings/{docId} {
+      allow read: if true;
+      allow write: if isAuth() && isAdmin();
+    }
+
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isAuth() && isAdmin();
+    }
+
+    match /super_admin/{docId} {
+      allow read: if true;
+      allow write: if isAuth() && isAdmin();
+    }
+
+    match /platform_config/{docId} {
+      allow read: if true;
+      allow write: if isAuth() && isAdmin();
+    }
+
+    match /tenants/{docId} {
+      allow read: if true;
+      allow write: if isAuth() && isAdmin();
+    }
+
+    // ─── Users ────────────────────────────────────────────────
+    match /users/{uid} {
+      allow read: if isAuth();
+      allow write: if isAuth() && (
+        isOwner(uid) || 
+        isAdminOrTeacher() || 
+        (resource == null 
+          ? request.resource.data.keys().hasAny(['totalEarnings', 'walletBalance', 'enrolledCourses']) 
+          : (
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalEarnings', 'walletBalance']) ||
+              (isOwner(uid) || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['enrolledCourses', 'displayName', 'imageUrl', 'photoURL', 'devices', 'lastActive']))
+            )
+        )
+      );
+    }
+
+    // ─── Courses ──────────────────────────────────────────────
+    match /courses/{docId} {
+      allow read: if true;
+      allow write: if isAuth() && isAdminOrTeacher();
+    }
+
+    match /Courses/{docId} {
+      allow read: if true;
+      allow write: if isAuth() && isAdminOrTeacher();
+    }
+
+    // ─── Lessons ──────────────────────────────────────────────
+    match /lessons/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && isAdminOrTeacher();
+    }
+
+    match /Lessons/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && isAdminOrTeacher();
+    }
+
+    // ─── Enrollments ──────────────────────────────────────────
+    match /enrollments/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    match /Enrollments/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    // ─── Discussions ──────────────────────────────────────────
+    match /discussions/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    match /Discussions/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    // ─── Quizzes ──────────────────────────────────────────────
+    match /quizzes/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && isAdminOrTeacher();
+    }
+
+    match /Quizzes/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && isAdminOrTeacher();
+    }
+
+    // ─── Questions (Bank) ─────────────────────────────────────
+    match /questions/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && isAdminOrTeacher();
+    }
+
+    match /Questions/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && isAdminOrTeacher();
+    }
+
+    // ─── Codes & Coupons (Unified) ────────────────────────────
+    match /codes/{docId} {
+      allow read: if isAuth();
+      allow create, delete: if isAuth() && isAdminOrTeacher();
+      allow update: if isAuth();
+    }
+
+    match /Codes/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && isAdminOrTeacher();
+    }
+
+    match /ActivationCodes/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth() && isAdminOrTeacher();
+      allow update: if isAuth();
+      allow delete: if isAuth() && isAdminOrTeacher();
+    }
+
+    match /coupons/{docId} {
+      allow read: if isAuth();
+      allow create, delete: if isAuth() && isAdminOrTeacher();
+      allow update: if isAuth();
+    }
+
+    // ─── User Progress ────────────────────────────────────────
+    match /user_progress/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    match /progress/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    // ─── Transactions & Wallet Requests ──────────────────────
+    match /transactions/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    match /Transactions/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    match /wallet_requests/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    // ─── Homework Submissions ─────────────────────────────────
+    match /submissions/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    match /Submissions/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    match /homework_submissions/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    // ─── Student Results ──────────────────────────────────────
+    match /student_results/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth();
+    }
+
+    match /results/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    match /Results/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    match /offline_results/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && isAdminOrTeacher();
+    }
+
+    // ─── Notification Reads ───────────────────────────────────
+    match /notification_reads/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    // ─── Reviews & Ratings ────────────────────────────────────
+    match /courseReviews/{docId} {
+      allow read: if true;
+      allow write: if isAuth();
+    }
+
+    match /teacherRatings/{docId} {
+      allow read: if true;
+      allow write: if isAuth();
+    }
+
+    // ─── Question Attempts ────────────────────────────────────
+    match /question_attempts/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth();
+    }
+
+    // ─── Exams ────────────────────────────────────────────────
+    match /exams/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && isAdminOrTeacher();
+    }
+
+    // ─── Notifications ────────────────────────────────────────
+    match /notifications/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    // ─── Catch-all fallback ────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if isAuth();
+    }
+  }
+}

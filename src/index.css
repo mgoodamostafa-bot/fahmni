@@ -1,0 +1,639 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Cairo', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Readex Pro', ui-sans-serif, system-ui, sans-serif;
+
+  /* Primary Colors - Royal Blue */
+  --color-brand-600: #2563eb;
+  --color-brand-500: #3b82f6;
+  --color-brand-400: #60a5fa;
+  --color-brand-blue: var(--color-brand-600);
+
+  /* Accent Colors */
+  --color-accent-gold: #fbbf24;
+  --color-accent-gold-dark: #d97706;
+  --color-brand-yellow: #fbbf24;
+  --color-brand-yellow-700: #b45309;
+
+  /* Dark Mode Palette - Solid Black */
+  --color-space-900: #000000;
+  --color-space-800: #050505;
+  --color-space-700: #111111;
+
+  /* Semantic Colors */
+  --color-bg-light: #ffffff;
+  --color-bg-dark: #0a0f1a;
+  --color-card-light: #f8fafc;
+  --color-card-dark: #0d121f;
+  --color-text-light: #000000;
+  --color-text-dark: #ffffff;
+  --color-border-light: #e2e8f0;
+  --color-border-dark: #1e293b;
+
+  /* Spacing & Radii */
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-3xl: 2rem;
+
+  /* Custom Transitions */
+  --ease-spring: cubic-bezier(0.5, 1.5, 0.5, 1);
+
+  /* Extra Custom Theme Configs */
+  --shadow-3xl: 0 35px 60px -15px rgba(0, 0, 0, 0.3);
+}
+
+@layer base {
+  :root {
+    --bg-main: #0a0f1a;
+    --bg-card: #0d121f;
+    --text-main: #ffffff;
+    --border-main: rgba(59, 130, 246, 0.15); /* Light blue border */
+    --brand-primary: #3b82f6;
+  }
+
+  .dark {
+    --bg-main: #0a0f1a;
+    --bg-card: #0d121f;
+    --text-main: #ffffff;
+    --border-main: rgba(59, 130, 246, 0.15);
+    --brand-primary: #3b82f6;
+  }
+
+  body {
+    @apply font-sans antialiased bg-[var(--bg-main)] text-[var(--text-main)] selection:bg-brand-500/30;
+    direction: rtl;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    overflow-x: hidden;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-display font-black tracking-tight text-[var(--text-main)];
+  }
+
+  .mesh-gradient-bg {
+    background-color: #0a0f1a;
+    background-image:
+      radial-gradient(at 0% 0%, hsla(220, 100%, 15%, 1) 0, transparent 50%),
+      radial-gradient(at 50% 0%, hsla(210, 100%, 10%, 1) 0, transparent 50%),
+      radial-gradient(at 100% 0%, hsla(230, 100%, 15%, 1) 0, transparent 50%),
+      radial-gradient(at 50% 100%, hsla(220, 100%, 10%, 1) 0, transparent 50%);
+  }
+
+  .holography {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .holography::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+      115deg,
+      transparent 20%,
+      rgba(255, 255, 255, 0.05) 30%,
+      rgba(255, 255, 255, 0.15) 35%,
+      rgba(255, 255, 255, 0.05) 40%,
+      transparent 50%
+    );
+    transform: rotate(-15deg);
+    pointer-events: none;
+    animation: holograph-shimmer 4s ease-in-out infinite;
+  }
+
+  @keyframes holograph-shimmer {
+    0% {
+      transform: translateX(-30%) rotate(-15deg);
+    }
+    100% {
+      transform: translateX(30%) rotate(-15deg);
+    }
+  }
+}
+
+@layer components {
+  .shadow-blue-glow {
+    box-shadow: 0 0 40px -10px rgba(37, 99, 235, 0.4);
+  }
+
+  .glass-card {
+    background: rgba(13, 18, 31, 1);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    @apply border border-white/5 rounded-[2.5rem] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.6)];
+    transform: translateZ(0);
+    will-change: backdrop-filter, transform;
+  }
+
+  .glass-card-premium {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 100%);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    @apply border border-white/10 rounded-[3rem] shadow-2xl;
+  }
+
+  .glass-glow {
+    @apply relative overflow-hidden;
+  }
+
+  .glass-glow::after {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-tr from-brand-600/10 via-transparent to-purple-500/10 opacity-0 transition-opacity duration-500;
+  }
+
+  .glass-glow:hover::after {
+    @apply opacity-100;
+  }
+
+  .btn-primary {
+    @apply bg-brand-600 hover:bg-brand-500 text-white font-black py-4 px-10 rounded-2xl transition-all duration-500 shadow-xl shadow-brand-600/25 hover:shadow-brand-600/40 active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden relative;
+  }
+
+  .btn-primary::before {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full transition-transform duration-1000;
+  }
+
+  .btn-primary:hover::before {
+    @apply translate-x-full;
+  }
+
+  .btn-secondary {
+    @apply bg-[#fbbf24] hover:bg-[#d97706] text-black font-black py-4 px-10 rounded-2xl transition-all duration-500 shadow-xl active:scale-95 flex items-center justify-center gap-3;
+    box-shadow:
+      0 20px 25px -5px rgba(251, 191, 36, 0.2),
+      0 8px 10px -6px rgba(251, 191, 36, 0.2);
+  }
+  .btn-secondary:hover {
+    box-shadow:
+      0 20px 25px -5px rgba(251, 191, 36, 0.4),
+      0 8px 10px -6px rgba(251, 191, 36, 0.4);
+  }
+
+  .input-field {
+    @apply w-full bg-[#0a1220] border-2 border-brand-500/30 rounded-2xl px-6 py-4 focus:border-brand-blue focus:outline-none transition-all text-white font-black placeholder-white/30 shadow-sm focus:shadow-md;
+    font-size: 16px; /* Prevents auto-zoom on iOS */
+  }
+
+  /* Skeleton Loading Animation */
+  .skeleton {
+    @apply animate-pulse bg-slate-200 dark:bg-slate-800 rounded-xl;
+  }
+
+  .container-custom {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .mobile-stack {
+    @apply flex flex-col gap-6 md:gap-8;
+  }
+}
+
+@keyframes wiggle {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shine {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.animate-wiggle {
+  animation: wiggle 1.5s ease-in-out infinite;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 8s linear infinite;
+}
+
+.animate-shine {
+  animation: shine 1.5s ease-in-out infinite;
+}
+
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.rotate-x-2 {
+  transform: rotateX(2deg);
+}
+
+.rotate-y-2 {
+  transform: rotateY(2deg);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-brand-500/10 hover:bg-brand-500/30 rounded-full transition-all border-2 border-transparent bg-clip-padding;
+}
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 0;
+  }
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .glass-card {
+    border: 1px solid #eee !important;
+    box-shadow: none !important;
+    background: white !important;
+  }
+}
+
+/* Modal Hardening & Sidebar Isolation */
+body.modal-open {
+  overflow: hidden !important;
+}
+
+/* Modal hardening */
+
+.modal-fixed-center {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  z-index: 100010 !important;
+}
+
+.pseudo-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important; /* Dynamic viewport height for iOS */
+  z-index: 99999 !important;
+  background: black !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0)
+    env(safe-area-inset-left, 0) !important;
+}
+
+body.fullscreen-active {
+  overflow: hidden !important;
+  /* No position:fixed — that causes black screen on mobile */
+}
+
+/* 🛡️ Content Protection Styles */
+.fahmni-protected {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Prevent video download on long-press (iOS) */
+video::-webkit-media-controls-enclosure {
+  display: none !important;
+}
+video::-internal-media-controls-download-button {
+  display: none !important;
+}
+video::-webkit-media-controls-panel {
+  display: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   🎬 FahmniPlayer Premium Styles
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Custom range slider */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+input[type='range']::-moz-range-thumb {
+  width: 0;
+  height: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Player seek bar custom thumb (visible on hover) */
+.fahmni-seek-thumb::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  background: #3b82f6;
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+  cursor: pointer;
+}
+.fahmni-seek-thumb::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #3b82f6;
+  border-radius: 50%;
+  border: none;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+  cursor: pointer;
+}
+
+/* Volume slider */
+.fahmni-vol-thumb::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+  background: white;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.fahmni-vol-thumb::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: white;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+}
+
+/* Ripple animation for play button */
+@keyframes player-ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+.animate-player-ripple {
+  animation: player-ripple 1.2s ease-out infinite;
+}
+
+/* Buffer shimmer */
+@keyframes buffer-shimmer {
+  0% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0.3;
+  }
+}
+.animate-buffer-shimmer {
+  animation: buffer-shimmer 1.5s ease-in-out infinite;
+}
+
+/* Seek tooltip */
+.fahmni-seek-tooltip {
+  position: absolute;
+  bottom: 100%;
+  transform: translateX(-50%);
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.9);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: white;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 60;
+}
+
+/* Player container in fullscreen — fixed to viewport */
+.fahmni-fullscreen {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  z-index: 99999 !important;
+  background: #000 !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  aspect-ratio: auto !important;
+}
+
+.modal-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  background: rgba(0, 0, 0, 0.7) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: blur(8px) !important;
+  z-index: 100000 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   🍊 Fruit Identity System — Animations & Variables
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  --fruit-glow: rgba(59, 130, 246, 0.3);
+  --fruit-gradient: linear-gradient(135deg, #3b82f6, #2563eb);
+  --fruit-bg-accent: rgba(59, 130, 246, 0.08);
+  --fruit-emoji: '🫐';
+}
+
+@keyframes fruit-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-8px) rotate(3deg);
+  }
+  75% {
+    transform: translateY(4px) rotate(-2deg);
+  }
+}
+
+@keyframes fruit-bounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-14px) scale(1.08);
+  }
+}
+
+@keyframes fruit-wiggle {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(10deg);
+  }
+  75% {
+    transform: rotate(-10deg);
+  }
+}
+
+@keyframes fruit-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.12);
+    filter: brightness(1.15);
+  }
+}
+
+@keyframes fruit-squeeze {
+  0%,
+  100% {
+    transform: scale(1, 1);
+  }
+  30% {
+    transform: scale(1.12, 0.88);
+  }
+  60% {
+    transform: scale(0.92, 1.08);
+  }
+}
+
+@keyframes fruit-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-fruit-float {
+  animation: fruit-float 3s ease-in-out infinite;
+}
+.animate-fruit-bounce {
+  animation: fruit-bounce 2s ease-in-out infinite;
+}
+.animate-fruit-wiggle {
+  animation: fruit-wiggle 0.6s ease-in-out;
+}
+.animate-fruit-pulse {
+  animation: fruit-pulse 2s ease-in-out infinite;
+}
+.animate-fruit-squeeze {
+  animation: fruit-squeeze 1.5s ease-in-out infinite;
+}
+.animate-fruit-spin {
+  animation: fruit-spin 8s linear infinite;
+}
+
+.fruit-glow {
+  filter: drop-shadow(0 0 20px var(--fruit-glow));
+}
+
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.bg-white\/2 {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+/* Hide bottom navigation and remove bottom padding when taking an exam */
+body.taking-exam .student-bottom-nav,
+body.taking-exam .md\:hidden.fixed.bottom-0 {
+  display: none !important;
+}
+
+body.taking-exam main {
+  padding-bottom: 0 !important;
+}

@@ -1,0 +1,9 @@
+dist/
+node_modules/
+build/
+coverage/
+*.min.js
+*.min.css
+package-lock.json
+server.js
+.firebase/

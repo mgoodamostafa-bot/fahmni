@@ -1,0 +1,207 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the platform (student or admin).",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["student", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role", "createdAt"]
+    },
+    "Course": {
+      "title": "Course",
+      "description": "A course offered on the platform.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "imageUrl": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "thumbnailUrl": { "type": "string" },
+        "isPublished": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "teacherId": { "type": "string" },
+        "isPaid": { "type": "boolean" },
+        "subject": { "type": "string" }
+      },
+      "required": ["title", "price", "isPublished", "createdAt", "teacherId", "isPaid", "subject"]
+    },
+    "Section": {
+      "title": "Section",
+      "description": "A section within a course.",
+      "type": "object",
+      "properties": {
+        "courseId": { "type": "string" },
+        "title": { "type": "string" },
+        "order": { "type": "number" }
+      },
+      "required": ["courseId", "title", "order"]
+    },
+    "Lesson": {
+      "title": "Lesson",
+      "description": "A lesson within a section.",
+      "type": "object",
+      "properties": {
+        "sectionId": { "type": "string" },
+        "courseId": { "type": "string" },
+        "title": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "pdfUrl": { "type": "string" },
+        "order": { "type": "number" },
+        "isFreePreview": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["courseId", "title", "videoUrl", "order", "isFreePreview", "createdAt"]
+    },
+    "Quiz": {
+      "title": "Quiz",
+      "description": "A quiz for a lesson.",
+      "type": "object",
+      "properties": {
+        "lessonId": { "type": "string" },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "question": { "type": "string" },
+              "options": { "type": "array", "items": { "type": "string" } },
+              "correctIndex": { "type": "number" }
+            },
+            "required": ["question", "options", "correctIndex"]
+          }
+        }
+      },
+      "required": ["lessonId", "questions"]
+    },
+    "Enrollment": {
+      "title": "Enrollment",
+      "description": "A student's enrollment in a course.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "courseId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "active", "rejected"] },
+        "paymentMethod": { "type": "string", "enum": ["stripe", "vodafone_cash", "free"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "vodafoneCashNumber": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "stripeSessionId": { "type": "string" }
+      },
+      "required": ["userId", "courseId", "status", "paymentMethod", "createdAt"]
+    },
+    "Progress": {
+      "title": "Progress",
+      "description": "A student's progress in a course.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "courseId": { "type": "string" },
+        "completedLessons": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["userId", "courseId", "completedLessons"]
+    },
+    "SiteSettings": {
+      "title": "SiteSettings",
+      "description": "Global site settings like name and logo.",
+      "type": "object",
+      "properties": {
+        "siteName": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "tagline": { "type": "string" },
+        "seoDescription": { "type": "string" }
+      },
+      "required": ["siteName", "logoUrl"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "Logs of admin actions.",
+      "type": "object",
+      "properties": {
+        "adminId": { "type": "string" },
+        "action": { "type": "string" },
+        "targetId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["adminId", "action", "timestamp"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "Admin alerts.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "message": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "message", "read", "createdAt"]
+    },
+    "ActivationCode": {
+      "title": "ActivationCode",
+      "description": "A code used to unlock a course.",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "courseId": { "type": "string" },
+        "isUsed": { "type": "boolean" },
+        "usedBy": { "type": "string" },
+        "usedAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["code", "courseId", "isUsed", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/activationCodes/{codeId}": {
+      "schema": { "$ref": "#/entities/ActivationCode" },
+      "description": "Stores activation codes."
+    },
+    "/siteSettings/global": {
+      "schema": { "$ref": "#/entities/SiteSettings" },
+      "description": "Stores global site settings."
+    },
+    "/activityLogs/{logId}": {
+      "schema": { "$ref": "#/entities/ActivityLog" },
+      "description": "Stores admin activity logs."
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "Stores admin notifications."
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores user profiles."
+    },
+    "/courses/{courseId}": {
+      "schema": { "$ref": "#/entities/Course" },
+      "description": "Stores courses."
+    },
+    "/sections/{sectionId}": {
+      "schema": { "$ref": "#/entities/Section" },
+      "description": "Stores sections for courses."
+    },
+    "/lessons/{lessonId}": {
+      "schema": { "$ref": "#/entities/Lesson" },
+      "description": "Stores lessons for sections."
+    },
+    "/quizzes/{quizId}": {
+      "schema": { "$ref": "#/entities/Quiz" },
+      "description": "Stores quizzes for lessons."
+    },
+    "/enrollments/{enrollmentId}": {
+      "schema": { "$ref": "#/entities/Enrollment" },
+      "description": "Stores student enrollments."
+    },
+    "/progress/{progressId}": {
+      "schema": { "$ref": "#/entities/Progress" },
+      "description": "Stores student progress."
+    }
+  }
+}

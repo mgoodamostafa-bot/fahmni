@@ -1,0 +1,9 @@
+{
+  "name": "Fahmni",
+  "description": "Educational platform for simplified learning",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
