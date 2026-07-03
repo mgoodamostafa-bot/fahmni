@@ -185,10 +185,10 @@ export const AdminAddCourse: React.FC = () => {
         teacherId: formData.teacherId || user.uid,
         teacherName: formData.teacherId
           ? teachers.find((t) => t.id === formData.teacherId)?.displayName || 'مدرس'
-          : profile?.displayName || 'مدرس',
+          : profile?.displayName || user.displayName || user.email?.split('@')[0] || 'مدرس',
         teacherPhotoURL: formData.teacherId
-          ? teachers.find((t) => t.id === formData.teacherId)?.imageUrl || ''
-          : profile?.imageUrl || profile?.photoURL || '',
+          ? teachers.find((t) => t.id === formData.teacherId)?.imageUrl || teachers.find((t) => t.id === formData.teacherId)?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(teachers.find((t) => t.id === formData.teacherId)?.displayName || 'مدرس')}&background=0a1220&color=2563eb`
+          : profile?.imageUrl || profile?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.displayName || user.displayName || user.email?.split('@')[0] || 'مدرس')}&background=0a1220&color=2563eb`,
         subject: formData.subject,
         level: formData.level,
         grade: formData.grade,

@@ -25,6 +25,7 @@ import {
   X,
 } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { smartGetDocs } from '../../utils/firestore';
 
 export const TeacherPortfolio: React.FC = () => {
   const { profile, user } = useAuth();
@@ -45,9 +46,7 @@ export const TeacherPortfolio: React.FC = () => {
   const fetchCourses = async () => {
     if (!user) return;
     try {
-      const q = query(collection(db, 'Courses'));
-      const snap = await getDocs(q);
-      const fetchedCourses = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const fetchedCourses = await smartGetDocs('Courses');
       setCourses(fetchedCourses);
     } catch (err) {
       console.error(err);
@@ -57,9 +56,8 @@ export const TeacherPortfolio: React.FC = () => {
   const fetchResources = async () => {
     if (!user) return;
     try {
-      const q = query(collection(db, 'PortfolioResources'));
-      const snap = await getDocs(q);
-      setResources(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      const fetchedResources = await smartGetDocs('PortfolioResources');
+      setResources(fetchedResources);
     } catch (err) {
       console.error(err);
     } finally {
