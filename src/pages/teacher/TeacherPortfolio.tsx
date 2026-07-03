@@ -9,8 +9,9 @@ import {
   serverTimestamp,
   deleteDoc,
   doc,
+  updateDoc,
 } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { db, getTenantDb } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   FileText,
@@ -23,6 +24,7 @@ import {
   Link as LinkIcon,
   CheckCircle,
   X,
+  Pen,
 } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { smartGetDocs } from '../../utils/firestore';
@@ -42,6 +44,14 @@ export const TeacherPortfolio: React.FC = () => {
   const [courseId, setCourseId] = useState('');
   const [pdfUrl, setPdfUrl] = useState('');
   const [subject, setSubject] = useState('');
+
+  // Edit Resource state
+  const [editingResource, setEditingResource] = useState<any | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editPdfUrl, setEditPdfUrl] = useState('');
+  const [editSubject, setEditSubject] = useState('');
+  const [editCourseId, setEditCourseId] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
 
   const fetchCourses = async () => {
     if (!user) return;
@@ -144,14 +154,94 @@ export const TeacherPortfolio: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (res: any) => {
     if (!window.confirm('هل أنت متأكد من حذف هذه المذكرة؟')) return;
     try {
-      await deleteDoc(doc(db, 'PortfolioResources', id));
-      setResources((prev) => prev.filter((r) => r.id !== id));
-      sendNotification({ type: 'info', title: 'تم الحذف', message: 'تم حذف المذكرة من الحقيبة' });
+      if (res._isLesson) {
+        const docRefLower = doc(getTenantDb(), 'lessons', res.id);
+        const docRefUpper = doc(getTenantDb(), 'Lessons', res.id);
+        await Promise.allSettled([
+          updateDoc(docRefLower, { pdfUrl: "" }),
+          updateDoc(docRefUpper, { pdfUrl: "" })
+        ]);
+        sendNotification({ type: 'info', title: 'تم الحذف', message: 'تم إزالة المذكرة من الدرس بنجاح' });
+      } else {
+        await deleteDoc(doc(getTenantDb(), 'PortfolioResources', res.id));
+        sendNotification({ type: 'info', title: 'تم الحذف', message: 'تم حذف المذكرة من الحقيبة' });
+      }
+      setResources((prev) => prev.filter((r) => r.id !== res.id));
     } catch (err) {
       console.error(err);
+      sendNotification({ type: 'error', title: 'خطأ', message: 'حدث خطأ أثناء محاولة حذف المذكرة' });
+    }
+  };
+
+  const handleStartEdit = (res: any) => {
+    setEditingResource(res);
+    setEditTitle(res.title);
+    setEditPdfUrl(res.pdfUrl);
+    setEditSubject(res.subject || '');
+    setEditCourseId(res.courseId || '');
+  };
+
+  const handleUpdateResource = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingResource || !editTitle || !editPdfUrl) {
+      sendNotification({ type: 'error', title: 'خطأ', message: 'يرجى ملء الحقول المطلوبة' });
+      return;
+    }
+
+    setEditSaving(true);
+    try {
+      if (editingResource._isLesson) {
+        const docRefLower = doc(getTenantDb(), 'lessons', editingResource.id);
+        const docRefUpper = doc(getTenantDb(), 'Lessons', editingResource.id);
+        
+        const updatePayload = {
+          title: editTitle,
+          pdfUrl: editPdfUrl,
+          subject: editSubject,
+        };
+
+        await Promise.allSettled([
+          updateDoc(docRefLower, updatePayload),
+          updateDoc(docRefUpper, updatePayload)
+        ]);
+      } else {
+        const docRef = doc(getTenantDb(), 'PortfolioResources', editingResource.id);
+        const selectedCourse = courses.find((c) => c.id === editCourseId);
+        
+        await updateDoc(docRef, {
+          title: editTitle,
+          pdfUrl: editPdfUrl,
+          courseId: editCourseId,
+          courseTitle: selectedCourse?.title || editingResource.courseTitle || 'كورس غير معروف',
+          subject: editSubject || selectedCourse?.subject || 'عام',
+        });
+      }
+
+      setResources((prev) =>
+        prev.map((r) =>
+          r.id === editingResource.id
+            ? {
+                ...r,
+                title: editTitle,
+                pdfUrl: editPdfUrl,
+                subject: editSubject,
+                courseId: editCourseId,
+                courseTitle: courses.find((c) => c.id === editCourseId)?.title || r.courseTitle,
+              }
+            : r
+        )
+      );
+
+      sendNotification({ type: 'success', title: 'تم التحديث', message: 'تم تحديث تفاصيل المذكرة بنجاح' });
+      setEditingResource(null);
+    } catch (err) {
+      console.error(err);
+      sendNotification({ type: 'error', title: 'خطأ', message: 'حدث خطأ أثناء تحديث المذكرة' });
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -308,14 +398,20 @@ export const TeacherPortfolio: React.FC = () => {
               animate={{ scale: 1, opacity: 1 }}
               className="bg-white/5 border border-white/10 rounded-2xl p-6 relative group hover:border-emerald-500/30 transition-all shadow-lg"
             >
-              {!res._isLesson && (
+              <div className="absolute top-4 left-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                 <button
-                  onClick={() => handleDelete(res.id)}
-                  className="absolute top-4 left-4 p-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                  onClick={() => handleStartEdit(res)}
+                  className="p-2 bg-brand-blue/10 text-brand-blue hover:bg-brand-blue hover:text-white rounded-lg transition-colors"
+                >
+                  <Pen size={16} />
+                </button>
+                <button
+                  onClick={() => handleDelete(res)}
+                  className="p-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-colors"
                 >
                   <Trash2 size={16} />
                 </button>
-              )}
+              </div>
 
               <div className="w-12 h-12 bg-emerald-500/10 text-emerald-500 rounded-xl flex items-center justify-center mb-4">
                 <FileText size={24} />
@@ -344,6 +440,125 @@ export const TeacherPortfolio: React.FC = () => {
           ))
         )}
       </div>
+
+      {/* Edit Modal */}
+      <AnimatePresence>
+        {editingResource && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-[#0f172a] border border-white/10 rounded-[2rem] p-6 md:p-8 w-full max-w-lg shadow-2xl relative"
+            >
+              <button
+                onClick={() => setEditingResource(null)}
+                className="absolute top-6 left-6 p-2 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl transition-all"
+              >
+                <X size={20} />
+              </button>
+
+              <h2 className="text-xl font-black text-white flex items-center gap-2 mb-6">
+                <FileText className="text-brand-blue" /> تعديل تفاصيل المذكرة
+              </h2>
+
+              <form onSubmit={handleUpdateResource} className="space-y-6">
+                {!editingResource._isLesson && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">
+                      الكورس المستهدف *
+                    </label>
+                    <select
+                      value={editCourseId}
+                      onChange={(e) => setEditCourseId(e.target.value)}
+                      required
+                      className="w-full bg-space-900 border border-white/10 rounded-xl px-4 py-3 text-white font-bold focus:outline-none focus:border-brand-blue"
+                    >
+                      <option value="">اختر الكورس...</option>
+                      {courses.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest">
+                    العنوان أو المادة *
+                  </label>
+                  <input
+                    type="text"
+                    value={editSubject}
+                    onChange={(e) => setEditSubject(e.target.value)}
+                    required
+                    placeholder="مثال: فيزياء الحديثة"
+                    className="w-full bg-space-900 border border-white/10 rounded-xl px-4 py-3 text-white font-bold focus:outline-none focus:border-brand-blue"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest">
+                    عنوان المذكرة *
+                  </label>
+                  <input
+                    type="text"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    required
+                    placeholder="مثال: ملخص قوانين الفصل الأول"
+                    className="w-full bg-space-900 border border-white/10 rounded-xl px-4 py-3 text-white font-bold focus:outline-none focus:border-brand-blue"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest">
+                    رابط ملف PDF *
+                  </label>
+                  <div className="relative">
+                    <LinkIcon
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500"
+                      size={18}
+                    />
+                    <input
+                      type="url"
+                      value={editPdfUrl}
+                      onChange={(e) => setEditPdfUrl(e.target.value)}
+                      required
+                      placeholder="https://..."
+                      className="w-full bg-space-900 border border-white/10 rounded-xl py-3 pr-12 pl-4 text-white font-bold focus:outline-none focus:border-brand-blue text-left"
+                      dir="ltr"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-4 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingResource(null)}
+                    className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white font-black rounded-xl transition-all border border-white/5"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={editSaving}
+                    className="flex-1 py-4 bg-brand-blue hover:bg-brand-blue/90 text-white font-black rounded-xl transition-all shadow-xl shadow-brand-blue/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {editSaving ? (
+                      <Loader2 className="animate-spin" size={20} />
+                    ) : (
+                      <CheckCircle size={20} />
+                    )}
+                    {editSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
