@@ -239,22 +239,59 @@ app.get('/api/download-proxy', async (req: any, res: any) => {
 
   try {
     let targetUrl = fileUrl;
+    let fileId: string | null = null;
 
     if (fileUrl.includes('drive.google.com')) {
       const match = fileUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || fileUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
       if (match && match[1]) {
-        targetUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`;
+        fileId = match[1];
+        targetUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
       }
     }
 
-    const response = await fetch(targetUrl);
+    let response;
+
+    if (fileId) {
+      // 1. GET request to fetch cookies (and trigger warning if necessary)
+      const getRes = await fetch(targetUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      });
+
+      const contentType = getRes.headers.get('content-type') || '';
+
+      if (contentType.includes('text/html')) {
+        const cookies = getRes.headers.getSetCookie();
+        const warningCookie = cookies.find(c => c.includes('download_warning'));
+
+        if (warningCookie) {
+          const cookieString = warningCookie.split(';')[0];
+          // 2. POST request with the warning-confirmation cookie to get actual PDF bytes
+          response = await fetch(targetUrl, {
+            method: 'POST',
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Cookie': cookieString
+            }
+          });
+        } else {
+          response = getRes;
+        }
+      } else {
+        response = getRes;
+      }
+    } else {
+      response = await fetch(targetUrl);
+    }
+
     if (!response.ok) {
       res.status(response.status).json({ error: `Failed to fetch target file: ${response.statusText}` });
       return;
     }
 
-    const contentType = response.headers.get('content-type') || 'application/octet-stream';
-    res.setHeader('Content-Type', contentType);
+    const finalContentType = response.headers.get('content-type') || 'application/octet-stream';
+    res.setHeader('Content-Type', finalContentType);
 
     const contentLength = response.headers.get('content-length');
     if (contentLength) {
