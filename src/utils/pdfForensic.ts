@@ -67,17 +67,17 @@ export async function stampPDFWithForensics(
     const rowSpacing = 8;
     const colSpacing = 8;
     
-    // Light faint yellow dots (invisible to naked eye, dark on Blue Channel filter)
-    const yellowColor = rgb(0.99, 0.99, 0.75); 
-    const dotSize = 1.5; 
+    // Pure yellow dots (invisible to naked eye on white background, glows bright red under blue-channel filter)
+    const yellowColor = rgb(1.0, 1.0, 0.0); 
+    const dotSize = 1.8; // Slightly larger for better photo/camera scan quality
 
-    // Draw reference anchors using rectangles
+    // Draw reference anchors using rectangles:
     // Anchor A: Start point (top-left of grid)
-    page.drawRectangle({ x: gridX - colSpacing, y: gridY, width: dotSize, height: dotSize, color: yellowColor });
-    // Anchor B: Row end (top-right of grid)
-    page.drawRectangle({ x: gridX + 10 * colSpacing, y: gridY, width: dotSize, height: dotSize, color: yellowColor });
-    // Anchor C: Column end (bottom-left of grid)
     page.drawRectangle({ x: gridX - colSpacing, y: gridY + 7 * rowSpacing, width: dotSize, height: dotSize, color: yellowColor });
+    // Anchor B: Row end (top-right of grid)
+    page.drawRectangle({ x: gridX + 10 * colSpacing, y: gridY + 7 * rowSpacing, width: dotSize, height: dotSize, color: yellowColor });
+    // Anchor C: Column end (bottom-left of grid)
+    page.drawRectangle({ x: gridX - colSpacing, y: gridY, width: dotSize, height: dotSize, color: yellowColor });
 
     // Encode Student ID (8 digits, zero-padded)
     const paddedId = data.studentId.padStart(8, '0').slice(-8); 
@@ -86,7 +86,8 @@ export async function stampPDFWithForensics(
       const digit = parseInt(paddedId[r]) || 0; 
       
       const x = gridX + digit * colSpacing;
-      const y = gridY + r * rowSpacing;
+      // In PDF coordinates, y=0 is bottom, so row 0 (top of grid) has y = gridY + 7 * rowSpacing
+      const y = gridY + (7 - r) * rowSpacing;
 
       page.drawRectangle({ x, y, width: dotSize, height: dotSize, color: yellowColor });
     }

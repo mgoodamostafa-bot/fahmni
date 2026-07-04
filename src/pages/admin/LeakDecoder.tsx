@@ -324,10 +324,16 @@ export const LeakDecoder: React.FC = () => {
 
           {imageSrc && (
             <div className="bg-slate-900/20 border border-white/5 p-5 rounded-2xl flex flex-col sm:flex-row gap-4 items-center justify-between">
-              <div className="text-right space-y-1">
-                <p className="text-xs text-gray-500 font-bold">💡 طريقة معايرة الشبكة الجنائية:</p>
-                <p className="text-xs text-gray-400 font-bold leading-relaxed">
-                  قم بسحب المقبض **الأزرق (أ)** وضعه على أول نقطة صفراء في الشبكة، ثم المقبض **الأخضر (ب)** وضعه على آخر نقطة بالصف، والمقبض **الأحمر (ج)** وضعه على آخر نقطة بالعمود.
+              <div className="text-right space-y-2 max-w-xl">
+                <p className="text-xs text-red-400 font-black">💡 دليل فك البصمة الجنائية:</p>
+                <p className="text-xs text-gray-400 font-medium leading-relaxed">
+                  1. البصمة الجنائية (النقاط الصفراء المخفية) تقع دائماً في <span className="text-yellow-400 font-bold">منتصف أسفل الصفحة</span> (على بعد 2-3 سم من الحافة السفلية).
+                </p>
+                <p className="text-xs text-gray-400 font-medium leading-relaxed">
+                  2. اضغط أولاً على زر <span className="text-red-500 font-bold">"فك قناة اللون"</span> بالجانب الأيسر لتتحول النقاط الصفراء المخفية إلى <span className="text-red-400 font-bold">نقاط حمراء مضيئة</span> واضحة للغاية.
+                </p>
+                <p className="text-xs text-gray-400 font-medium leading-relaxed">
+                  3. قم بسحب المقابض وضبطها كالتالي: المقبض **الأزرق (أ)** على النقطة المضيئة في أعلى اليسار، المقبض **الأخضر (ب)** على أعلى اليمين، والمقبض **الأحمر (ج)** على أسفل اليسار.
                 </p>
               </div>
               <button
