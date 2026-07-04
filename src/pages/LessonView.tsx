@@ -222,6 +222,68 @@ export const LessonView: React.FC = () => {
       setBuyingBooklet(false);
     }
   };
+
+  const [downloadingBooklet, setDownloadingBooklet] = useState(false);
+  const handleDownloadBooklet = async () => {
+    if (!currentLesson?.pdfUrl) return;
+    setDownloadingBooklet(true);
+    try {
+      const url = currentLesson.pdfUrl;
+      const filename = currentLesson.title || 'ملخص الحصة';
+      
+      const isPdf =
+        url.toLowerCase().includes('.pdf') ||
+        url.toLowerCase().includes('/o/portfolioresources') ||
+        url.toLowerCase().includes('/o/lessons') ||
+        url.toLowerCase().includes('drive.google.com') ||
+        url.toLowerCase().includes('dropbox.com');
+
+      if (isPdf && profile) {
+        let ipAddress = 'Local';
+        try {
+          const { getPublicIP } = await import('../lib/deviceFingerprint');
+          ipAddress = await getPublicIP(2000);
+        } catch (e) {
+          console.warn('Could not fetch public IP for watermark', e);
+        }
+
+        // Bypass CORS for external links by routing through our backend download proxy
+        const fetchUrl = url.includes('drive.google.com') || url.includes('dropbox.com')
+          ? `/api/download-proxy?url=${encodeURIComponent(url)}`
+          : url;
+
+        const response = await fetch(fetchUrl);
+        if (!response.ok) throw new Error('Failed to fetch PDF file');
+        const arrayBuffer = await response.arrayBuffer();
+
+        const { stampPDFWithForensics } = await import('../utils/pdfForensic');
+        const stampedBytes = await stampPDFWithForensics(arrayBuffer, {
+          studentName: profile.displayName,
+          studentPhone: profile.studentPhone || profile.email,
+          studentId: profile.studentId || '000000',
+          ipAddress,
+        });
+
+        const blob = new Blob([stampedBytes], { type: 'application/pdf' });
+        const downloadUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = `${filename}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(downloadUrl);
+      } else {
+        const { downloadViaProxy } = await import('../utils/download');
+        await downloadViaProxy(url, `${filename}.pdf`);
+      }
+    } catch (err) {
+      console.error('Forensic download failed, falling back to direct tab open:', err);
+      window.open(currentLesson.pdfUrl, '_blank');
+    } finally {
+      setDownloadingBooklet(false);
+    }
+  };
   const [homeworkLink, setHomeworkLink] = useState('');
   const [activationCode, setActivationCode] = useState('');
   const [showActivationPopup, setShowActivationPopup] = useState(false);
@@ -1332,14 +1394,17 @@ export const LessonView: React.FC = () => {
                                 </div>
                                 <span className="font-bold text-sm text-gray-200">ملخص ومذكرة الحصة (PDF)</span>
                               </div>
-                              <a
-                                href={currentLesson.pdfUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="p-3 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-xl transition-all shadow hover:scale-105 flex items-center justify-center"
+                              <button
+                                onClick={handleDownloadBooklet}
+                                disabled={downloadingBooklet}
+                                className="p-3 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-xl transition-all shadow hover:scale-105 flex items-center justify-center cursor-pointer disabled:opacity-50"
                               >
-                                <Download size={18} />
-                              </a>
+                                {downloadingBooklet ? (
+                                  <Loader2 size={18} className="animate-spin" />
+                                ) : (
+                                  <Download size={18} />
+                                )}
+                              </button>
                             </div>
                           ) : (
                             <div className="bg-white/5 border border-white/5 rounded-3xl p-6 text-center space-y-4 max-w-md mx-auto">
