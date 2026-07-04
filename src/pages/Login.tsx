@@ -59,7 +59,7 @@ export const Login: React.FC = () => {
     // Check if account was deleted (Ghost Account)
     if (user && !profile && !authLoading) {
       setIsGhostAccount(true);
-      setError('خطأ في الحساب: يبدو أن بياناتك قد تم حذفها من قبل المسؤول.');
+      setError('البريد الإلكتروني غير مسجل بالمنصة.');
     }
 
     const pendingError = sessionStorage.getItem('auth_error');
@@ -93,9 +93,28 @@ export const Login: React.FC = () => {
     setError('');
     setIsGhostAccount(false);
     try {
-      await signInWithEmailAndPassword(getTenantAuth(), email, password);
+      const userCredential = await signInWithEmailAndPassword(getTenantAuth(), email, password);
+      
+      // Verify that user profile exists in Firestore
+      const { doc, getDoc } = await import('firebase/firestore');
+      const { getTenantDb } = await import('../lib/firebase');
+      const docRef = doc(getTenantDb(), 'users', userCredential.user.uid);
+      const s = await getDoc(docRef);
+      if (!s.exists()) {
+        const { signOut } = await import('firebase/auth');
+        await signOut(getTenantAuth());
+        setError('البريد الإلكتروني غير مسجل بالمنصة.');
+      }
     } catch (err: any) {
-      setError('فشل تسجيل الدخول. تأكد من البريد الإلكتروني وكلمة المرور.');
+      if (
+        err.code === 'auth/user-not-found' ||
+        err.code === 'auth/wrong-password' ||
+        err.code === 'auth/invalid-credential'
+      ) {
+        setError('فشل تسجيل الدخول. البريد الإلكتروني غير مسجل أو كلمة المرور خاطئة.');
+      } else {
+        setError('فشل تسجيل الدخول. تأكد من البريد الإلكتروني وكلمة المرور.');
+      }
     } finally {
       setLoading(false);
     }

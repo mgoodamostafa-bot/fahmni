@@ -57,6 +57,19 @@ export const Register: React.FC = () => {
       return;
     }
 
+    const hasLetter = /[a-zA-Z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    if (password.length < 6) {
+      setError('يجب أن تكون كلمة المرور مكونة من 6 أحرف على الأقل.');
+      setLoading(false);
+      return;
+    }
+    if (!hasLetter || !hasNumber) {
+      setError('يجب أن تحتوي كلمة المرور على حروف وأرقام معاً (ليست أرقاماً فقط).');
+      setLoading(false);
+      return;
+    }
+
     if (!name || name.trim().split(/\s+/).length < 2) {
       setError('الرجاء إدخال الاسم بالكامل (ثلاثي أو رباعي على الأقل).');
       setLoading(false);

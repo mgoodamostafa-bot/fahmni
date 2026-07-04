@@ -176,27 +176,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           addLog(`getDoc completed. Document exists: ${s.exists()}`);
 
           const isRegistering = sessionStorage.getItem('is_registering') === 'true';
-          if (!s.exists()) {
+           if (!s.exists()) {
             addLog(`Document missing. isRegistering state: ${isRegistering}`);
             if (!isRegistering) {
-              addLog("Auto-creating default student profile document...");
-              const defaultProfile = {
-                uid: u.uid,
-                email: u.email || '',
-                displayName: u.displayName || 'مستخدم جديد',
-                role: 'student',
-                createdAt: new Date().toISOString(),
-              };
+              addLog("Profile document missing. Signing out immediately...");
               try {
-                const { setDoc } = await import('firebase/firestore');
-                await setDoc(docRef, defaultProfile);
-                addLog("Default profile document successfully created.");
-                setProfile(defaultProfile as UserProfile);
-              } catch (createErr: any) {
-                addLog(`❌ Failed to auto-create profile: ${createErr.message || createErr}`);
-                setAuthError(`Auto-Create Error: ${createErr.message || 'Unknown'}`);
-                setProfile(null);
+                await signOut(currentAuth);
+              } catch (signErr) {
+                console.error("Sign out error:", signErr);
               }
+              setUser(null);
+              setProfile(null);
               setLoading(false);
               clearTimeout(forceUnfreeze);
               return;
@@ -330,6 +320,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setProfile({ ...d, level: normalizedLevel, uid: u.uid, email: u.email || '', role: nr } as UserProfile);
               setNeedsGradeSelection(nr === 'student' && (!d.grade || !normalizedLevel));
               if (nr === 'student') setAccountBlocked(d.accountStatus === 'blocked');
+              setLoading(false);
+              clearTimeout(forceUnfreeze);
+            } else {
+              addLog("onSnapshot: Student profile document deleted! Signing out...");
+              signOut(currentAuth).catch((err) => console.error(err));
+              setUser(null);
+              setProfile(null);
               setLoading(false);
               clearTimeout(forceUnfreeze);
             }

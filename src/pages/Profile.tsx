@@ -95,6 +95,13 @@ export const Profile: React.FC = () => {
   // Password reset state
   const [passwordSent, setPasswordSent] = React.useState(false);
 
+  // Password change states
+  const [currentPassword, setCurrentPassword] = React.useState('');
+  const [newPassword, setNewPassword] = React.useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = React.useState('');
+  const [showPasswordForm, setShowPasswordForm] = React.useState(false);
+  const [updatingPassword, setUpdatingPassword] = React.useState(false);
+
   // Coupon Topup State
   const [topupCode, setTopupCode] = React.useState('');
   const [toppingUp, setToppingUp] = React.useState(false);
@@ -368,6 +375,56 @@ export const Profile: React.FC = () => {
       setTimeout(() => setPasswordSent(false), 5000);
     } catch {
       setError('فشل إرسال رابط إعادة تعيين كلمة المرور');
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmNewPassword) {
+      setError('كلمتا المرور الجديدتان غير متطابقتين.');
+      return;
+    }
+
+    const hasLetter = /[a-zA-Z]/.test(newPassword);
+    const hasNumber = /[0-9]/.test(newPassword);
+    if (newPassword.length < 6) {
+      setError('يجب أن تكون كلمة المرور مكونة من 6 أحرف على الأقل.');
+      return;
+    }
+    if (!hasLetter || !hasNumber) {
+      setError('يجب أن تحتوي كلمة المرور الجديدة على حروف وأرقام معاً (ليست أرقاماً فقط).');
+      return;
+    }
+
+    setUpdatingPassword(true);
+    setError(null);
+    try {
+      const { EmailAuthProvider, reauthenticateWithCredential, updatePassword } = await import('firebase/auth');
+      const auth = getTenantAuth();
+      if (!auth.currentUser || !user?.email) throw new Error('مستخدم غير معروف');
+
+      // Re-authenticate first
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(auth.currentUser, credential);
+
+      // Update password
+      await updatePassword(auth.currentUser, newPassword);
+
+      setSuccess(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+      setShowPasswordForm(false);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err: any) {
+      console.error(err);
+      if (err.code === 'auth/wrong-password') {
+        setError('كلمة المرور الحالية غير صحيحة.');
+      } else {
+        setError(err.message || 'فشل تحديث كلمة المرور. حاول مرة أخرى.');
+      }
+    } finally {
+      setUpdatingPassword(false);
     }
   };
 
@@ -1149,42 +1206,105 @@ export const Profile: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between py-2 border-b border-white/5">
-                      <span className="text-gray-500 text-xs font-bold">البريد الإلكتروني</span>
-                      <span className="text-white text-sm font-black font-mono select-all">{user.email}</span>
-                    </div>
-                    <div className="flex items-center justify-between py-2 border-b border-white/5">
-                      <span className="text-gray-500 text-xs font-bold">صلاحية الحساب</span>
-                      <span className="text-brand-blue text-xs font-black bg-brand-blue/15 px-3 py-1 rounded-full">
-                        {profile.role?.toUpperCase()}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between py-2 border-b border-white/5">
-                      <span className="text-gray-500 text-xs font-bold">تاريخ الانضمام للمنصة</span>
-                      <span className="text-white text-sm font-black">
-                        {profile.createdAt ? new Date(profile.createdAt).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'}
-                      </span>
-                    </div>
-                  </div>
+                  {showPasswordForm ? (
+                    <form onSubmit={handleUpdatePassword} className="space-y-5 animate-in fade-in duration-300">
+                      <div className="space-y-2 text-right">
+                        <label className="text-xs sm:text-sm font-black text-slate-300">كلمة المرور الحالية</label>
+                        <input
+                          type="password"
+                          required
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          className="w-full px-5 py-4 bg-slate-950/40 border border-white/10 rounded-2xl text-white text-sm outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 font-bold"
+                        />
+                      </div>
 
-                  <div className="flex flex-col sm:flex-row gap-3 pt-4">
-                    <button
-                      onClick={handlePasswordReset}
-                      className="flex-1 py-4 rounded-2xl bg-white/5 text-gray-300 border border-white/10 font-bold text-xs hover:bg-white/10 hover:text-white transition-all flex items-center justify-center gap-1.5"
-                    >
-                      <Key size={14} /> إعادة تعيين كلمة المرور
-                    </button>
-                    <button
-                      onClick={async () => {
-                        await signOut(getTenantAuth());
-                        navigate('/login');
-                      }}
-                      className="flex-1 py-4 rounded-2xl bg-rose-600/10 text-rose-500 border border-rose-500/20 font-black text-xs hover:bg-rose-600 hover:text-white transition-all flex items-center justify-center gap-1.5"
-                    >
-                      <LogOut size={14} /> تسجيل الخروج من الحساب
-                    </button>
-                  </div>
+                      <div className="space-y-2 text-right">
+                        <label className="text-xs sm:text-sm font-black text-slate-300">كلمة المرور الجديدة</label>
+                        <input
+                          type="password"
+                          required
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="حروف وأرقام، 6 خانات كحد أدنى"
+                          className="w-full px-5 py-4 bg-slate-950/40 border border-white/10 rounded-2xl text-white text-sm outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 font-bold"
+                        />
+                      </div>
+
+                      <div className="space-y-2 text-right">
+                        <label className="text-xs sm:text-sm font-black text-slate-300">تأكيد كلمة المرور الجديدة</label>
+                        <input
+                          type="password"
+                          required
+                          value={confirmNewPassword}
+                          onChange={(e) => setConfirmNewPassword(e.target.value)}
+                          className="w-full px-5 py-4 bg-slate-950/40 border border-white/10 rounded-2xl text-white text-sm outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 font-bold"
+                        />
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                        <button
+                          type="submit"
+                          disabled={updatingPassword}
+                          className="flex-1 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          {updatingPassword ? <Loader2 className="animate-spin" size={14} /> : <Key size={14} />}
+                          {updatingPassword ? 'جاري تحديث كلمة المرور...' : 'حفظ كلمة المرور الجديدة'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowPasswordForm(false);
+                            setCurrentPassword('');
+                            setNewPassword('');
+                            setConfirmNewPassword('');
+                          }}
+                          className="flex-1 py-4 rounded-2xl bg-white/5 text-gray-300 border border-white/10 font-bold text-xs hover:bg-white/10 hover:text-white transition-all flex items-center justify-center gap-1.5"
+                        >
+                          إلغاء التراجع
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between py-2 border-b border-white/5">
+                          <span className="text-gray-500 text-xs font-bold">البريد الإلكتروني</span>
+                          <span className="text-white text-sm font-black font-mono select-all">{user.email}</span>
+                        </div>
+                        <div className="flex items-center justify-between py-2 border-b border-white/5">
+                          <span className="text-gray-500 text-xs font-bold">صلاحية الحساب</span>
+                          <span className="text-brand-blue text-xs font-black bg-brand-blue/15 px-3 py-1 rounded-full">
+                            {profile.role?.toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between py-2 border-b border-white/5">
+                          <span className="text-gray-500 text-xs font-bold">تاريخ الانضمام للمنصة</span>
+                          <span className="text-white text-sm font-black">
+                            {profile.createdAt ? new Date(profile.createdAt).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                        <button
+                          onClick={() => setShowPasswordForm(true)}
+                          className="flex-1 py-4 rounded-2xl bg-white/5 text-gray-300 border border-white/10 font-bold text-xs hover:bg-white/10 hover:text-white transition-all flex items-center justify-center gap-1.5"
+                        >
+                          <Key size={14} /> تغيير كلمة المرور مباشرة
+                        </button>
+                        <button
+                          onClick={async () => {
+                            await signOut(getTenantAuth());
+                            navigate('/login');
+                          }}
+                          className="flex-1 py-4 rounded-2xl bg-rose-600/10 text-rose-500 border border-rose-500/20 font-black text-xs hover:bg-rose-600 hover:text-white transition-all flex items-center justify-center gap-1.5"
+                        >
+                          <LogOut size={14} /> تسجيل الخروج من الحساب
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 

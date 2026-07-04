@@ -377,7 +377,20 @@ export const AddExam: React.FC = () => {
             obj.optionC || obj['ج'] || '',
             obj.optionD || obj['د'] || '',
           ] as [string, string, string, string],
-          correctOptionIndex: parseInt(obj.correctOptionIndex || '0'),
+          correctOptionIndex: (() => {
+            const val = obj.correctOptionIndex || obj['الإجابة الصحيحة'] || obj['الاجابة الصحيحة'] || obj['الإجابة'] || obj['الاجابة'] || '';
+            const cleanVal = val.toString().trim().toLowerCase();
+            if (cleanVal === 'أ' || cleanVal === 'ا' || cleanVal === 'a') return 0;
+            if (cleanVal === 'ب' || cleanVal === 'b') return 1;
+            if (cleanVal === 'ج' || cleanVal === 'c') return 2;
+            if (cleanVal === 'د' || cleanVal === 'd') return 3;
+            const num = parseInt(cleanVal);
+            if (!isNaN(num)) {
+              if (num >= 1 && num <= 4) return num - 1;
+              if (num >= 0 && num <= 3) return num;
+            }
+            return 0;
+          })(),
           explanation: obj.explanation || obj['الشرح'] || '',
           chapter: obj.chapter || obj['الفصل'] || '',
           difficulty: (obj.difficulty || 'medium') as 'easy' | 'medium' | 'hard',
