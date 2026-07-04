@@ -177,6 +177,11 @@ export const StudentLibrary: React.FC = () => {
   }, [user]);
 
   const handleDownload = async (url: string, filename: string, id: string) => {
+    if (url.includes('drive.google.com') || url.includes('dropbox.com')) {
+      window.open(url, '_blank');
+      return;
+    }
+
     setDownloading(id);
     try {
       const isPdf =
