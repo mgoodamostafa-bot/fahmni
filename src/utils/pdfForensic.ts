@@ -7,6 +7,14 @@ export interface StampData {
   ipAddress?: string;
 }
 
+function sanitizeToAscii(str: string): string {
+  if (!str) return '';
+  return str.split('').filter(char => {
+    const code = char.charCodeAt(0);
+    return code >= 32 && code <= 126;
+  }).join('').trim();
+}
+
 /**
  * 🛡️ Stamped PDF Generator (Visible & Forensic Steganographic Watermarks)
  * Stamped completely in-memory to prevent leaks of raw un-watermarked PDFs.
@@ -18,9 +26,15 @@ export async function stampPDFWithForensics(
   const pdfDoc = await PDFDocument.load(pdfBuffer);
   const pages = pdfDoc.getPages();
 
-  const ipText = data.ipAddress ? ` | IP: ${data.ipAddress}` : '';
-  const dateText = new Date().toLocaleDateString('ar-EG');
-  const visibleText = `طالب: ${data.studentName} | هاتف: ${data.studentPhone} | كود: ${data.studentId}${ipText} | ${dateText}`;
+  const cleanName = sanitizeToAscii(data.studentName);
+  const cleanPhone = sanitizeToAscii(data.studentPhone);
+  const cleanId = sanitizeToAscii(data.studentId);
+  const cleanIp = data.ipAddress ? sanitizeToAscii(data.ipAddress) : '';
+  const dateText = new Date().toLocaleDateString('en-US');
+
+  const ipPart = cleanIp ? ` | IP: ${cleanIp}` : '';
+  const namePart = cleanName ? `User: ${cleanName} | ` : '';
+  const visibleText = `${namePart}ID: ${cleanId} | Tel: ${cleanPhone}${ipPart} | Date: ${dateText}`;
 
   for (const page of pages) {
     const { width, height } = page.getSize();
