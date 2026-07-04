@@ -260,6 +260,7 @@ export const LessonView: React.FC = () => {
         const stampedBytes = await stampPDFWithForensics(arrayBuffer, {
           studentName: profile.displayName,
           studentPhone: profile.studentPhone || profile.email,
+          studentEmail: profile.email,
           studentId: profile.studentId || '000000',
           ipAddress,
         });

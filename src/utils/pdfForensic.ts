@@ -3,6 +3,7 @@ import { PDFDocument, rgb, degrees } from 'pdf-lib';
 export interface StampData {
   studentName: string;
   studentPhone: string;
+  studentEmail?: string;
   studentId: string;
   ipAddress?: string;
 }
@@ -29,19 +30,26 @@ export async function stampPDFWithForensics(
   const cleanName = sanitizeToAscii(data.studentName);
   const cleanPhone = sanitizeToAscii(data.studentPhone);
   const cleanId = sanitizeToAscii(data.studentId);
+  const cleanEmail = data.studentEmail ? sanitizeToAscii(data.studentEmail) : cleanPhone;
   const cleanIp = data.ipAddress ? sanitizeToAscii(data.ipAddress) : '';
   const dateText = new Date().toLocaleDateString('en-US');
 
   const ipPart = cleanIp ? ` | IP: ${cleanIp}` : '';
-  const namePart = cleanName ? `User: ${cleanName} | ` : '';
-  const visibleText = `${namePart}ID: ${cleanId} | Tel: ${cleanPhone}${ipPart} | Date: ${dateText}`;
+  const namePart = cleanName ? `${cleanName} | ` : '';
+  const visibleText = `ID: ${cleanId} | ${namePart}${cleanEmail}${ipPart} | Date: ${dateText}`;
+
+  // 1. Inject Forensic Document Metadata
+  pdfDoc.setTitle(`Forensic Copy - ID: ${cleanId}`);
+  pdfDoc.setAuthor('Fahmni Education Security');
+  pdfDoc.setSubject(`Licensed to: ${cleanEmail} (Tel: ${cleanPhone})`);
+  pdfDoc.setKeywords([`id:${cleanId}`, `email:${cleanEmail}`, `phone:${cleanPhone}`, `ip:${cleanIp}`]);
 
   for (const page of pages) {
     const { width, height } = page.getSize();
 
-    // 1. Draw Visible Watermark (diagonally across page)
-    const fontColor = rgb(0.7, 0.7, 0.7); // Light gray
-    const opacity = 0.12; // High transparency
+    // 2. Draw Visible Watermark (diagonally across page)
+    const fontColor = rgb(0.65, 0.65, 0.65); // Slightly darker gray (clearer)
+    const opacity = 0.18; // Increased opacity (clearer sika)
 
     const stepsX = 2;
     const stepsY = 3;
@@ -53,7 +61,7 @@ export async function stampPDFWithForensics(
         page.drawText(visibleText, {
           x: posX,
           y: posY,
-          size: 10,
+          size: 11, // Increased text size
           color: fontColor,
           opacity: opacity,
           rotate: degrees(30),
@@ -61,7 +69,7 @@ export async function stampPDFWithForensics(
       }
     }
 
-    // 2. Draw Invisible Forensic Yellow Dot Grid (Bottom Center)
+    // 3. Draw Invisible Forensic Yellow Dot Grid (Bottom Center)
     const gridX = width / 2 - 50;
     const gridY = 40;
     const rowSpacing = 8;
