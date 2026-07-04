@@ -229,6 +229,49 @@ function extractVideoId(url: string) {
   return match ? match[1] : url;
 }
 
+// Global API download proxy to bypass CORS on external files (e.g. Google Drive)
+app.get('/api/download-proxy', async (req: any, res: any) => {
+  const fileUrl = req.query.url;
+  if (!fileUrl) {
+    res.status(400).json({ error: 'Missing url query parameter' });
+    return;
+  }
+
+  try {
+    let targetUrl = fileUrl;
+
+    if (fileUrl.includes('drive.google.com')) {
+      const match = fileUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || fileUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      if (match && match[1]) {
+        targetUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`;
+      }
+    }
+
+    const response = await fetch(targetUrl);
+    if (!response.ok) {
+      res.status(response.status).json({ error: `Failed to fetch target file: ${response.statusText}` });
+      return;
+    }
+
+    const contentType = response.headers.get('content-type') || 'application/octet-stream';
+    res.setHeader('Content-Type', contentType);
+
+    const contentLength = response.headers.get('content-length');
+    if (contentLength) {
+      res.setHeader('Content-Length', contentLength);
+    }
+
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    res.send(buffer);
+  } catch (error: any) {
+    console.error('Proxy Download Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to download file through proxy' });
+  }
+});
+
 // YouTube Playlist Import API
 app.get('/api/youtube/playlist', async (req, res) => {
   const { playlistId } = req.query;

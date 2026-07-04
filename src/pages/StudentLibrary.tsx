@@ -177,17 +177,14 @@ export const StudentLibrary: React.FC = () => {
   }, [user]);
 
   const handleDownload = async (url: string, filename: string, id: string) => {
-    if (url.includes('drive.google.com') || url.includes('dropbox.com')) {
-      window.open(url, '_blank');
-      return;
-    }
-
     setDownloading(id);
     try {
       const isPdf =
         url.toLowerCase().includes('.pdf') ||
         url.toLowerCase().includes('/o/portfolioresources') ||
-        url.toLowerCase().includes('/o/lessons');
+        url.toLowerCase().includes('/o/lessons') ||
+        url.toLowerCase().includes('drive.google.com') ||
+        url.toLowerCase().includes('dropbox.com');
 
       if (isPdf && profile) {
         let ipAddress = 'Local';
@@ -198,7 +195,12 @@ export const StudentLibrary: React.FC = () => {
           console.warn('Could not fetch public IP for watermark', e);
         }
 
-        const response = await fetch(url);
+        // Bypass CORS for external links by routing through our backend download proxy
+        const fetchUrl = url.includes('drive.google.com') || url.includes('dropbox.com')
+          ? `/api/download-proxy?url=${encodeURIComponent(url)}`
+          : url;
+
+        const response = await fetch(fetchUrl);
         if (!response.ok) throw new Error('Failed to fetch PDF file');
         const arrayBuffer = await response.arrayBuffer();
 
@@ -223,12 +225,8 @@ export const StudentLibrary: React.FC = () => {
         await downloadViaProxy(url, `${filename}.pdf`);
       }
     } catch (err) {
-      console.error('Forensic download failed, falling back to direct:', err);
-      try {
-        await downloadViaProxy(url, `${filename}.pdf`);
-      } catch (proxyErr) {
-        console.error(proxyErr);
-      }
+      console.error('Forensic download failed, falling back to direct tab open:', err);
+      window.open(url, '_blank');
     } finally {
       setDownloading(null);
     }
