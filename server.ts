@@ -9,6 +9,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { google } from 'googleapis';
 
 dotenv.config();
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;

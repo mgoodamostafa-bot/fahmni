@@ -224,8 +224,9 @@ export const StudentLibrary: React.FC = () => {
       } else {
         await downloadViaProxy(url, `${filename}.pdf`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Forensic download failed, falling back to direct tab open:', err);
+      alert(`عذراً، فشل التحميل الآمن للبصمة المائية بسبب: ${err.message || err}\nسيتم فتح الملف مباشرة كبديل.`);
       window.open(url, '_blank');
     } finally {
       setDownloading(null);
