@@ -30,6 +30,8 @@ interface UserProfile {
   defaultCommission?: number;
   balance?: number;
   school?: string;
+  studentPhone?: string;
+  fatherPhone?: string;
 }
 
 interface AuthContextType {

@@ -46,7 +46,7 @@ interface GroupedResources {
 }
 
 export const StudentLibrary: React.FC = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [resources, setResources] = useState<Resource[]>([]);
   const [groupedResources, setGroupedResources] = useState<GroupedResources>({});
   const [loading, setLoading] = useState(true);
@@ -179,7 +179,51 @@ export const StudentLibrary: React.FC = () => {
   const handleDownload = async (url: string, filename: string, id: string) => {
     setDownloading(id);
     try {
-      await downloadViaProxy(url, `${filename}.pdf`);
+      const isPdf =
+        url.toLowerCase().includes('.pdf') ||
+        url.toLowerCase().includes('/o/portfolioresources') ||
+        url.toLowerCase().includes('/o/lessons');
+
+      if (isPdf && profile) {
+        let ipAddress = 'Local';
+        try {
+          const { getPublicIP } = await import('../lib/deviceFingerprint');
+          ipAddress = await getPublicIP(2000);
+        } catch (e) {
+          console.warn('Could not fetch public IP for watermark', e);
+        }
+
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Failed to fetch PDF file');
+        const arrayBuffer = await response.arrayBuffer();
+
+        const { stampPDFWithForensics } = await import('../utils/pdfForensic');
+        const stampedBytes = await stampPDFWithForensics(arrayBuffer, {
+          studentName: profile.displayName,
+          studentPhone: profile.studentPhone || profile.email,
+          studentId: profile.studentId || '000000',
+          ipAddress,
+        });
+
+        const blob = new Blob([stampedBytes], { type: 'application/pdf' });
+        const downloadUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = `${filename}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(downloadUrl);
+      } else {
+        await downloadViaProxy(url, `${filename}.pdf`);
+      }
+    } catch (err) {
+      console.error('Forensic download failed, falling back to direct:', err);
+      try {
+        await downloadViaProxy(url, `${filename}.pdf`);
+      } catch (proxyErr) {
+        console.error(proxyErr);
+      }
     } finally {
       setDownloading(null);
     }

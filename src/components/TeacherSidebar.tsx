@@ -29,6 +29,7 @@ import {
   BarChart3,
   Tag,
   Shield,
+  ShieldAlert,
   Building2,
   UsersRound,
   FileSpreadsheet,
@@ -78,6 +79,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({ isOpen, onClose 
     { icon: <Shield size={22} />, label: 'بوابات الدفع', path: '/teacher/payment-settings' },
     { icon: <Wrench size={22} />, label: 'الصيانة', path: '/teacher/maintenance' },
     { icon: <Stethoscope size={22} />, label: 'تشخيص النظام', path: '/teacher/diagnostic' },
+    { icon: <ShieldAlert size={22} className="text-red-500" />, label: 'كاشف التسريبات الجنائي', path: '/teacher/leak-decoder' },
     { icon: <User size={22} />, label: 'حسابي', path: '/profile' },
   ];
 

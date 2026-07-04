@@ -130,6 +130,9 @@ const TeacherFinanceDetails = lazy(() =>
 const AttendanceScanner = lazy(() =>
   import('./pages/admin/AttendanceScanner').then((m) => ({ default: m.AttendanceScanner }))
 );
+const LeakDecoder = lazy(() =>
+  import('./pages/admin/LeakDecoder').then((m) => ({ default: m.LeakDecoder }))
+);
 
 const TeacherLayout = lazy(() =>
   import('./pages/teacher/TeacherLayout').then((m) => ({ default: m.TeacherLayout }))
@@ -644,6 +647,7 @@ function AppRouter() {
               <Route path="offline-results" element={<OfflineResults />} />
               <Route path="diagnostic" element={<Diagnostic />} />
               <Route path="attendance" element={<AttendanceScanner />} />
+              <Route path="leak-decoder" element={<LeakDecoder />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />
