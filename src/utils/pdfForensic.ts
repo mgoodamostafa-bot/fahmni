@@ -69,35 +69,53 @@ export async function stampPDFWithForensics(
       }
     }
 
-    // 3. Draw Invisible Forensic Yellow Dot Grid (Bottom Center)
-    const gridX = width / 2 - 50;
-    const gridY = 40;
-    const rowSpacing = 8;
-    const colSpacing = 8;
+    // 3. Draw Invisible Forensic Barcode Watermark (Bottom Center)
+    const barcodeHeight = 22;
+    const barcodeY = 35; // 35 units from the bottom
     
-    // Pure yellow dots (invisible to naked eye on white background, glows bright red under blue-channel filter)
-    const yellowColor = rgb(1.0, 1.0, 0.0); 
-    const dotSize = 1.8; // Slightly larger for better photo/camera scan quality
-
-    // Draw reference anchors using rectangles:
-    // Anchor A: Start point (top-left of grid)
-    page.drawRectangle({ x: gridX - colSpacing, y: gridY + 7 * rowSpacing, width: dotSize, height: dotSize, color: yellowColor });
-    // Anchor B: Row end (top-right of grid)
-    page.drawRectangle({ x: gridX + 10 * colSpacing, y: gridY + 7 * rowSpacing, width: dotSize, height: dotSize, color: yellowColor });
-    // Anchor C: Column end (bottom-left of grid)
-    page.drawRectangle({ x: gridX - colSpacing, y: gridY, width: dotSize, height: dotSize, color: yellowColor });
-
-    // Encode Student ID (8 digits, zero-padded)
-    const paddedId = data.studentId.padStart(8, '0').slice(-8); 
+    // Pure yellow color (virtually invisible on white background, highly contrasty on blue-channel filter)
+    const barcodeColor = rgb(1.0, 1.0, 0.0);
     
-    for (let r = 0; r < 8; r++) {
-      const digit = parseInt(paddedId[r]) || 0; 
+    // Generate bit array
+    const paddedId = data.studentId.padStart(8, '0').slice(-8);
+    const bits: number[] = [1, 0, 1]; // Start pattern
+    
+    for (let i = 0; i < 8; i++) {
+      const digit = parseInt(paddedId[i]) || 0;
+      // Convert digit to 4-bit binary array (e.g. 5 -> [0, 1, 0, 1])
+      const digitBits = [
+        (digit >> 3) & 1,
+        (digit >> 2) & 1,
+        (digit >> 1) & 1,
+        digit & 1
+      ];
+      bits.push(...digitBits);
+    }
+    bits.push(1, 0, 1); // Stop pattern
+
+    // Calculate total width of barcode to center it
+    // 1 bit: wide = 6 units, narrow = 2 units.
+    // Plus spacing of 3 units between bits.
+    let totalBarcodeWidth = 0;
+    for (const bit of bits) {
+      totalBarcodeWidth += (bit === 1 ? 6 : 2) + 3;
+    }
+    totalBarcodeWidth -= 3; // Remove last spacing
+
+    const startX = (width - totalBarcodeWidth) / 2;
+    let currentX = startX;
+
+    for (const bit of bits) {
+      const thickness = bit === 1 ? 6 : 2;
       
-      const x = gridX + digit * colSpacing;
-      // In PDF coordinates, y=0 is bottom, so row 0 (top of grid) has y = gridY + 7 * rowSpacing
-      const y = gridY + (7 - r) * rowSpacing;
+      page.drawLine({
+        start: { x: currentX + thickness / 2, y: barcodeY },
+        end: { x: currentX + thickness / 2, y: barcodeY + barcodeHeight },
+        thickness,
+        color: barcodeColor,
+      });
 
-      page.drawRectangle({ x, y, width: dotSize, height: dotSize, color: yellowColor });
+      currentX += thickness + 3; // Move to next position
     }
   }
 

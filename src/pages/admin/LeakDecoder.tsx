@@ -140,8 +140,6 @@ export const LeakDecoder: React.FC = () => {
       setActivePoint('A');
     } else if (dist(pointB) < hitRadius) {
       setActivePoint('B');
-    } else if (dist(pointC) < hitRadius) {
-      setActivePoint('C');
     }
   };
 
@@ -151,14 +149,13 @@ export const LeakDecoder: React.FC = () => {
 
     if (activePoint === 'A') setPointA(pos);
     if (activePoint === 'B') setPointB(pos);
-    if (activePoint === 'C') setPointC(pos);
   };
 
   const handleMouseUp = () => {
     setActivePoint(null);
   };
 
-  // Decode yellow dot matrix from canvas
+  // Decode yellow barcode scanline from canvas
   const handleDecode = async () => {
     if (!canvasRef.current || !image) return;
     setDecoding(true);
@@ -170,7 +167,7 @@ export const LeakDecoder: React.FC = () => {
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Could not get canvas context');
 
-      // We need to sample the original image (not forensic-filtered to avoid binary artifacts)
+      // Sample original image bytes (not filtered)
       const sampleCanvas = document.createElement('canvas');
       sampleCanvas.width = canvas.width;
       sampleCanvas.height = canvas.height;
@@ -180,61 +177,132 @@ export const LeakDecoder: React.FC = () => {
       const imgData = sCtx.getImageData(0, 0, sampleCanvas.width, sampleCanvas.height);
       const data = imgData.data;
 
-      // Vector calculations
-      // Vector AB (X axis) represents columns 0 to 9
-      const vecX = { x: (pointB.x - pointA.x) / 10, y: (pointB.y - pointA.y) / 10 };
-      // Vector AC (Y axis) represents rows 0 to 7
-      const vecY = { x: (pointC.x - pointA.x) / 7, y: (pointC.y - pointA.y) / 7 };
-
-      let decodedString = '';
-
-      // Sample each row
-      for (let r = 0; r < 8; r++) {
-        let maxYellowDensity = -1;
-        let selectedDigit = 0;
-
-        // Sample each digit column (0 to 9)
-        for (let d = 0; d < 10; d++) {
-          const sampX = Math.round(pointA.x + r * vecY.x + d * vecX.x);
-          const sampY = Math.round(pointA.y + r * vecY.y + d * vecX.y);
-
-          // Sample a small 5x5 region around the point to counter noise
-          let yellowIntensitySum = 0;
-          let samplesCount = 0;
-
-          for (let dx = -2; dx <= 2; dx++) {
-            for (let dy = -2; dy <= 2; dy++) {
-              const sx = sampX + dx;
-              const sy = sampY + dy;
-              if (sx >= 0 && sx < sampleCanvas.width && sy >= 0 && sy < sampleCanvas.height) {
-                const idx = (sy * sampleCanvas.width + sx) * 4;
-                const red = data[idx];
-                const green = data[idx + 1];
-                const blue = data[idx + 2];
-
-                // Yellow density metric: (Red + Green) - 2 * Blue
-                const yellowMetric = (red + green) - 2 * blue;
-                yellowIntensitySum += yellowMetric;
-                samplesCount++;
-              }
-            }
-          }
-
-          const avgDensity = yellowIntensitySum / (samplesCount || 1);
-          if (avgDensity > maxYellowDensity) {
-            maxYellowDensity = avgDensity;
-            selectedDigit = d;
-          }
-        }
-
-        decodedString += selectedDigit.toString();
+      // Scanline from Point A (start) to Point B (end)
+      const dx = pointB.x - pointA.x;
+      const dy = pointB.y - pointA.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      if (dist < 20) {
+        throw new Error('يرجى تحديد بداية ونهاية الباركود بشكل صحيح بسحب النقطة الزرقاء والخضراء.');
       }
 
-      setDecodedId(decodedString);
+      // Number of samples along the scanline (proportional to distance)
+      const numSamples = Math.round(dist * 2);
+      const yellowValues: number[] = [];
+
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / (numSamples - 1);
+        const sx = Math.round(pointA.x + t * dx);
+        const sy = Math.round(pointA.y + t * dy);
+
+        if (sx >= 0 && sx < sampleCanvas.width && sy >= 0 && sy < sampleCanvas.height) {
+          const idx = (sy * sampleCanvas.width + sx) * 4;
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+          
+          // Yellow metric: (Red + Green) - 2 * Blue
+          const yellowMetric = (r + g) - 2 * b;
+          yellowValues.push(yellowMetric > 0 ? yellowMetric : 0);
+        } else {
+          yellowValues.push(0);
+        }
+      }
+
+      // Smooth the signal using a moving average window to eliminate noise
+      const smoothed: number[] = [];
+      const windowSize = 3;
+      for (let i = 0; i < yellowValues.length; i++) {
+        let sum = 0;
+        let count = 0;
+        for (let w = -windowSize; w <= windowSize; w++) {
+          if (i + w >= 0 && i + w < yellowValues.length) {
+            sum += yellowValues[i + w];
+            count++;
+          }
+        }
+        smoothed.push(sum / count);
+      }
+
+      // Calculate dynamic threshold: 45% of maximum intensity
+      const maxVal = Math.max(...smoothed);
+      const minVal = Math.min(...smoothed);
+      const threshold = minVal + (maxVal - minVal) * 0.45;
+
+      // Binarize signal (1 = bar, 0 = space)
+      const binary = smoothed.map(val => (val > threshold ? 1 : 0));
+
+      // Find bars (run-length encoding of 1s)
+      const runs: { start: number; end: number; width: number }[] = [];
+      let inRun = false;
+      let runStart = 0;
+
+      for (let i = 0; i < binary.length; i++) {
+        if (binary[i] === 1 && !inRun) {
+          inRun = true;
+          runStart = i;
+        } else if (binary[i] === 0 && inRun) {
+          inRun = false;
+          const runEnd = i - 1;
+          const width = runEnd - runStart + 1;
+          // Filter out tiny noise runs
+          if (width > dist * 0.005) {
+            runs.push({ start: runStart, end: runEnd, width });
+          }
+        }
+      }
+      if (inRun) {
+        runs.push({ start: runStart, end: binary.length - 1, width: binary.length - runStart });
+      }
+
+      console.log('Detected runs count:', runs.length, runs);
+
+      if (runs.length !== 38) {
+        throw new Error(`تم رصد عدد قضبان (${runs.length}) بدلاً من 38. يرجى محاذاة النقاط (أ) و (ب) بدقة أكبر على الباركود المضيء باللون الأحمر.`);
+      }
+
+      // Classify runs into narrow (0) and wide (1)
+      const widths = runs.map(r => r.width);
+      const minWidth = Math.min(...widths);
+      const maxWidth = Math.max(...widths);
+      const classificationThreshold = minWidth + (maxWidth - minWidth) * 0.4;
+
+      const decodedBits = runs.map(r => (r.width > classificationThreshold ? 1 : 0));
+      console.log('Decoded bits:', decodedBits);
+
+      // Verify start and stop patterns: [1, 0, 1]
+      const startPattern = decodedBits.slice(0, 3);
+      const stopPattern = decodedBits.slice(-3);
+
+      if (startPattern[0] !== 1 || startPattern[1] !== 0 || startPattern[2] !== 1) {
+        console.warn('Start pattern mismatch:', startPattern);
+      }
+      if (stopPattern[0] !== 1 || stopPattern[1] !== 0 || stopPattern[2] !== 1) {
+        console.warn('Stop pattern mismatch:', stopPattern);
+      }
+
+      // Decode the 8 digits (4 bits each, from index 3 to 34)
+      let decodedId = '';
+      for (let i = 0; i < 8; i++) {
+        const bitIdx = 3 + i * 4;
+        const b3 = decodedBits[bitIdx];
+        const b2 = decodedBits[bitIdx + 1];
+        const b1 = decodedBits[bitIdx + 2];
+        const b0 = decodedBits[bitIdx + 3];
+        
+        const digit = (b3 << 3) | (b2 << 2) | (b1 << 1) | b0;
+        if (digit >= 0 && digit <= 9) {
+          decodedId += digit.toString();
+        } else {
+          decodedId += (digit % 10).toString();
+        }
+      }
+
+      setDecodedId(decodedId);
 
       // Search database for student ID
       const tenantDb = getTenantDb();
-      const q = query(collection(tenantDb, 'users'), where('studentId', '==', decodedString));
+      const q = query(collection(tenantDb, 'users'), where('studentId', '==', decodedId));
       const snap = await getDocs(q);
 
       if (!snap.empty) {
@@ -249,11 +317,11 @@ export const LeakDecoder: React.FC = () => {
           message: `تم فك التشفير بنجاح وتحديد الطالب: ${stuData.displayName}`,
         });
       } else {
-        setError(`لم يتم العثور على طالب مسجل بالكود: ${decodedString}`);
+        setError(`لم يتم العثور على طالب مسجل بالكود: ${decodedId}`);
       }
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'فشل فك التشفير الجنائي. تأكد من تحديد نقاط الشبكة بشكل صحيح.');
+      setError(err.message || 'فشل فك التشفير الجنائي. تأكد من مطابقة النقاط مع الباركود بشكل دقيق.');
     } finally {
       setDecoding(false);
     }
@@ -304,19 +372,15 @@ export const LeakDecoder: React.FC = () => {
                   viewBox={`0 0 ${image?.width || 100} ${image?.height || 100}`}
                   preserveAspectRatio="none"
                 >
-                  {/* Grid layout illustration */}
-                  <line x1={pointA.x} y1={pointA.y} x2={pointB.x} y2={pointB.y} stroke="rgba(239, 68, 68, 0.4)" strokeWidth="2" strokeDasharray="4" />
-                  <line x1={pointA.x} y1={pointA.y} x2={pointC.x} y2={pointC.y} stroke="rgba(239, 68, 68, 0.4)" strokeWidth="2" strokeDasharray="4" />
+                  {/* Barcode scanline illustration */}
+                  <line x1={pointA.x} y1={pointA.y} x2={pointB.x} y2={pointB.y} stroke="rgba(239, 68, 68, 0.6)" strokeWidth="3" strokeDasharray="4" />
 
                   {/* Draw calibration points */}
                   <circle cx={pointA.x} cy={pointA.y} r="8" fill="#3b82f6" stroke="white" strokeWidth="2" />
-                  <text x={pointA.x + 12} y={pointA.y - 12} fill="#3b82f6" fontSize="14" fontWeight="bold">أ (بداية الشبكة)</text>
+                  <text x={pointA.x + 12} y={pointA.y - 12} fill="#3b82f6" fontSize="14" fontWeight="bold">أ (بداية الباركود)</text>
 
                   <circle cx={pointB.x} cy={pointB.y} r="8" fill="#10b981" stroke="white" strokeWidth="2" />
-                  <text x={pointB.x + 12} y={pointB.y - 12} fill="#10b981" fontSize="14" fontWeight="bold">ب (نهاية الصف)</text>
-
-                  <circle cx={pointC.x} cy={pointC.y} r="8" fill="#ef4444" stroke="white" strokeWidth="2" />
-                  <text x={pointC.x + 12} y={pointC.y - 12} fill="#ef4444" fontSize="14" fontWeight="bold">ج (نهاية العمود)</text>
+                  <text x={pointB.x + 12} y={pointB.y - 12} fill="#10b981" fontSize="14" fontWeight="bold">ب (نهاية الباركود)</text>
                 </svg>
               </div>
             )}
@@ -325,15 +389,15 @@ export const LeakDecoder: React.FC = () => {
           {imageSrc && (
             <div className="bg-slate-900/20 border border-white/5 p-5 rounded-2xl flex flex-col sm:flex-row gap-4 items-center justify-between">
               <div className="text-right space-y-2 max-w-xl">
-                <p className="text-xs text-red-400 font-black">💡 دليل فك البصمة الجنائية:</p>
+                <p className="text-xs text-red-400 font-black">💡 دليل فك الباركود الجنائي المخفي:</p>
                 <p className="text-xs text-gray-400 font-medium leading-relaxed">
-                  1. البصمة الجنائية (النقاط الصفراء المخفية) تقع دائماً في <span className="text-yellow-400 font-bold">منتصف أسفل الصفحة</span> (على بعد 2-3 سم من الحافة السفلية).
+                  1. الباركود الجنائي المخفي يقع دائماً في <span className="text-yellow-400 font-bold">منتصف أسفل الصفحة</span> (على بعد 2-3 سم من الحافة السفلية).
                 </p>
                 <p className="text-xs text-gray-400 font-medium leading-relaxed">
-                  2. اضغط أولاً على زر <span className="text-red-500 font-bold">"فك قناة اللون"</span> بالجانب الأيسر لتتحول النقاط الصفراء المخفية إلى <span className="text-red-400 font-bold">نقاط حمراء مضيئة</span> واضحة للغاية.
+                  2. اضغط أولاً على زر <span className="text-red-500 font-bold">"فك قناة اللون"</span> بالجانب الأيسر لتتحول خطوط الباركود المخفية إلى <span className="text-red-400 font-bold">أعمدة حمراء مضيئة</span> واضحة للغاية.
                 </p>
                 <p className="text-xs text-gray-400 font-medium leading-relaxed">
-                  3. قم بسحب المقابض وضبطها كالتالي: المقبض **الأزرق (أ)** على النقطة المضيئة في أعلى اليسار، المقبض **الأخضر (ب)** على أعلى اليمين، والمقبض **الأحمر (ج)** على أسفل اليسار.
+                  3. قم بمطابقة الخط المتقطع مع الباركود: اسحب المقبض **الأزرق (أ)** وضعه على أول عمود مضيء جهة اليسار، والمقبض **الأخضر (ب)** على آخر عمود مضيء جهة اليمين.
                 </p>
               </div>
               <button
