@@ -105,8 +105,8 @@ export const LeakDecoder: React.FC = () => {
         // Invert blue channel (yellow has low blue, so inverted is high/bright)
         const invertedBlue = 255 - b;
 
-        // Apply contrast stretch
-        const finalVal = invertedBlue > 110 ? 255 : invertedBlue * 2;
+        // Apply contrast stretch: since barcode is extremely faint, any difference > 4 glows max red!
+        const finalVal = invertedBlue > 4 ? 255 : 0;
 
         data[i] = finalVal; // R: glow red
         data[i + 1] = 0;    // G: black
