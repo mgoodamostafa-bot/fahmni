@@ -135,7 +135,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const showSuggestedCourses = tenantData.showSuggestedCourses !== undefined ? tenantData.showSuggestedCourses : prev.showSuggestedCourses;
         const featuredCourseIds = tenantData.featuredCourseIds || prev.featuredCourseIds || [];
 
-        return {
+        const updated = {
           ...prev,
           siteName,
           logoUrl,
@@ -168,6 +168,15 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           imgbbApiKey: tenantData.imgbbApiKey !== undefined ? tenantData.imgbbApiKey : prev.imgbbApiKey,
           useFreeFileHosting: tenantData.useFreeFileHosting !== undefined ? tenantData.useFreeFileHosting : prev.useFreeFileHosting,
         };
+
+        // Persist to localStorage cache immediately so it stays in sync
+        try {
+          localStorage.setItem(CACHE_KEY, JSON.stringify({ data: updated, timestamp: Date.now() }));
+        } catch (e) {
+          console.warn("Error updating settings cache from tenantData:", e);
+        }
+
+        return updated;
       });
     }
   }, [tenantData]);
