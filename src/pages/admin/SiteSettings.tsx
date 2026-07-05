@@ -569,13 +569,15 @@ export const SiteSettings: React.FC = () => {
                       <Video size={18} className="text-emerald-500" />
                       فيديو دليل الطالب
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
+                    <div 
+                      onClick={() => setSettings({ ...settings, showStudentGuide: settings.showStudentGuide === false ? true : false })}
+                      className="flex items-center gap-2 cursor-pointer"
+                    >
                       <span className="text-sm font-bold text-gray-400">إظهار الدليل للطالب</span>
                       <div className={`w-12 h-6 rounded-full relative transition-colors ${settings.showStudentGuide !== false ? 'bg-emerald-500' : 'bg-gray-700'}`}>
                         <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${settings.showStudentGuide !== false ? 'right-7' : 'right-1'}`} />
                       </div>
-                      <input type="checkbox" checked={settings.showStudentGuide !== false} onChange={(e) => setSettings({ ...settings, showStudentGuide: e.target.checked })} className="hidden" />
-                    </label>
+                    </div>
                   </div>
                   <input
                     type="url"
@@ -592,13 +594,15 @@ export const SiteSettings: React.FC = () => {
                       <Video size={18} className="text-blue-500" />
                       فيديو دليل المدرس
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
+                    <div 
+                      onClick={() => setSettings({ ...settings, showTeacherGuide: settings.showTeacherGuide === false ? true : false })}
+                      className="flex items-center gap-2 cursor-pointer"
+                    >
                       <span className="text-sm font-bold text-gray-400">إظهار الدليل للمدرس</span>
                       <div className={`w-12 h-6 rounded-full relative transition-colors ${settings.showTeacherGuide !== false ? 'bg-blue-500' : 'bg-gray-700'}`}>
                         <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${settings.showTeacherGuide !== false ? 'right-7' : 'right-1'}`} />
                       </div>
-                      <input type="checkbox" checked={settings.showTeacherGuide !== false} onChange={(e) => setSettings({ ...settings, showTeacherGuide: e.target.checked })} className="hidden" />
-                    </label>
+                    </div>
                   </div>
                   <input
                     type="url"

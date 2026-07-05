@@ -1457,64 +1457,64 @@ export const SuperAdminDashboard = () => {
                       ))}
                     </div>
                      {/* Comprehensive Guide */}
-                    <div className="space-y-4 p-4 bg-blue-500/[0.03] border border-blue-500/15 rounded-2xl">
-                      <label className="text-sm font-black text-white">الدليل الشامل</label>
-                      <div className="space-y-4">
-                        {/* Student Guide */}
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <label className="text-xs font-bold text-gray-400">فيديو دليل الطالب</label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <span className="text-xs font-bold text-gray-400">إظهار للطالب</span>
-                              <div className={`w-8 h-4 rounded-full relative transition-colors ${(editingTenant as any).showStudentGuide !== false ? 'bg-brand-blue' : 'bg-white/10'}`}>
-                                <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${(editingTenant as any).showStudentGuide !== false ? 'right-4' : 'right-0.5'}`} />
-                              </div>
-                              <input 
-                                type="checkbox" 
-                                checked={(editingTenant as any).showStudentGuide !== false} 
-                                onChange={(e) => setEditingTenant({ ...editingTenant, showStudentGuide: e.target.checked } as any)} 
-                                className="hidden" 
-                              />
-                            </label>
-                          </div>
-                          <input
-                            type="url"
-                            value={(editingTenant as any).studentGuideVideoUrl || ''}
-                            onChange={(e) => setEditingTenant({ ...editingTenant, studentGuideVideoUrl: e.target.value } as any)}
-                            className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-blue focus:outline-none transition-colors"
-                            placeholder="رابط فيديو اليوتيوب لدليل الطالب..."
-                            dir="ltr"
-                          />
-                        </div>
+                     <div className="space-y-4 p-4 bg-blue-500/[0.03] border border-blue-500/15 rounded-2xl">
+                       <label className="text-sm font-black text-white">الدليل الشامل</label>
+                       <div className="space-y-4">
+                         {/* Student Guide */}
+                         <div className="space-y-2">
+                           <div className="flex items-center justify-between">
+                             <label className="text-xs font-bold text-gray-400">فيديو دليل الطالب</label>
+                             <div 
+                               onClick={() => setEditingTenant({ 
+                                 ...editingTenant, 
+                                 showStudentGuide: (editingTenant as any).showStudentGuide === false ? true : false 
+                               } as any)}
+                               className="flex items-center gap-2 cursor-pointer"
+                             >
+                               <span className="text-xs font-bold text-gray-400">إظهار للطالب</span>
+                               <div className={`w-8 h-4 rounded-full relative transition-colors ${(editingTenant as any).showStudentGuide !== false ? 'bg-brand-blue' : 'bg-white/10'}`}>
+                                 <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${(editingTenant as any).showStudentGuide !== false ? 'right-4' : 'right-0.5'}`} />
+                               </div>
+                             </div>
+                           </div>
+                           <input
+                             type="url"
+                             value={(editingTenant as any).studentGuideVideoUrl || ''}
+                             onChange={(e) => setEditingTenant({ ...editingTenant, studentGuideVideoUrl: e.target.value } as any)}
+                             className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-blue focus:outline-none transition-colors"
+                             placeholder="رابط فيديو اليوتيوب لدليل الطالب..."
+                             dir="ltr"
+                           />
+                         </div>
 
-                        {/* Teacher Guide */}
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <label className="text-xs font-bold text-gray-400">فيديو دليل المدرس</label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <span className="text-xs font-bold text-gray-400">إظهار للمدرس</span>
-                              <div className={`w-8 h-4 rounded-full relative transition-colors ${(editingTenant as any).showTeacherGuide !== false ? 'bg-brand-blue' : 'bg-white/10'}`}>
-                                <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${(editingTenant as any).showTeacherGuide !== false ? 'right-4' : 'right-0.5'}`} />
-                              </div>
-                              <input 
-                                type="checkbox" 
-                                checked={(editingTenant as any).showTeacherGuide !== false} 
-                                onChange={(e) => setEditingTenant({ ...editingTenant, showTeacherGuide: e.target.checked } as any)} 
-                                className="hidden" 
-                              />
-                            </label>
-                          </div>
-                          <input
-                            type="url"
-                            value={(editingTenant as any).teacherGuideVideoUrl || ''}
-                            onChange={(e) => setEditingTenant({ ...editingTenant, teacherGuideVideoUrl: e.target.value } as any)}
-                            className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-blue focus:outline-none transition-colors"
-                            placeholder="رابط فيديو اليوتيوب لدليل المدرس..."
-                            dir="ltr"
-                          />
-                        </div>
-                      </div>
-                    </div>
+                         {/* Teacher Guide */}
+                         <div className="space-y-2">
+                           <div className="flex items-center justify-between">
+                             <label className="text-xs font-bold text-gray-400">فيديو دليل المدرس</label>
+                             <div 
+                               onClick={() => setEditingTenant({ 
+                                 ...editingTenant, 
+                                 showTeacherGuide: (editingTenant as any).showTeacherGuide === false ? true : false 
+                               } as any)}
+                               className="flex items-center gap-2 cursor-pointer"
+                             >
+                               <span className="text-xs font-bold text-gray-400">إظهار للمدرس</span>
+                               <div className={`w-8 h-4 rounded-full relative transition-colors ${(editingTenant as any).showTeacherGuide !== false ? 'bg-brand-blue' : 'bg-white/10'}`}>
+                                 <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${(editingTenant as any).showTeacherGuide !== false ? 'right-4' : 'right-0.5'}`} />
+                               </div>
+                             </div>
+                           </div>
+                           <input
+                             type="url"
+                             value={(editingTenant as any).teacherGuideVideoUrl || ''}
+                             onChange={(e) => setEditingTenant({ ...editingTenant, teacherGuideVideoUrl: e.target.value } as any)}
+                             className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-blue focus:outline-none transition-colors"
+                             placeholder="رابط فيديو اليوتيوب لدليل المدرس..."
+                             dir="ltr"
+                           />
+                         </div>
+                       </div>
+                     </div>
 
                     {/* External Homework Storage Settings */}
                     <div className="space-y-4 p-4 bg-emerald-500/[0.03] border border-emerald-500/15 rounded-2xl">

@@ -72,16 +72,7 @@ const getEmbedInfo = (url: string) => {
 
 export const AccountGuide: React.FC<AccountGuideProps> = ({ videoUrl, role }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [isHidden, setIsHidden] = useState(
-    () => localStorage.getItem(`hide_guide_${role}`) === 'true'
-  );
-
-  const handleDismiss = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsHidden(true);
-    localStorage.setItem(`hide_guide_${role}`, 'true');
-  };
-
+  
   // Determine the final video URL with fallback defaults
   const finalVideoUrl = useMemo(() => {
     const url = videoUrl?.trim();
@@ -91,6 +82,30 @@ export const AccountGuide: React.FC<AccountGuideProps> = ({ videoUrl, role }) =>
       ? 'https://www.youtube.com/watch?v=7u3S-5J2BIA'
       : 'https://www.youtube.com/watch?v=vpPH_E9X4p0';
   }, [videoUrl, role]);
+
+  const [isHidden, setIsHidden] = useState(() => {
+    const cachedUrl = localStorage.getItem(`hide_guide_url_${role}`);
+    if (cachedUrl !== finalVideoUrl) {
+      return false;
+    }
+    return localStorage.getItem(`hide_guide_${role}`) === 'true';
+  });
+
+  React.useEffect(() => {
+    const cachedUrl = localStorage.getItem(`hide_guide_url_${role}`);
+    if (cachedUrl !== finalVideoUrl) {
+      setIsHidden(false);
+      localStorage.removeItem(`hide_guide_${role}`);
+      localStorage.removeItem(`hide_guide_url_${role}`);
+    }
+  }, [finalVideoUrl, role]);
+
+  const handleDismiss = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsHidden(true);
+    localStorage.setItem(`hide_guide_${role}`, 'true');
+    localStorage.setItem(`hide_guide_url_${role}`, finalVideoUrl);
+  };
 
   // Extract embed information
   const embedInfo = useMemo(() => getEmbedInfo(finalVideoUrl), [finalVideoUrl]);

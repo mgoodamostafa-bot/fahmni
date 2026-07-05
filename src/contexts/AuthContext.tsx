@@ -243,28 +243,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
           }
 
-          addLog("User is student. Setting profile, checking grade selection...");
-          if (s.exists()) {
-            setProfile(p);
-            setNeedsGradeSelection(r === 'student' && (!docData.grade || !docData.level));
-            // Unblock the UI immediately after setting profile if document already exists
-            setLoading(false);
-            clearTimeout(forceUnfreeze);
-          }
-
-          const verifyStudentDevice = async () => {
+          let deviceVerified = false;
+          const verifyStudentDevice = async (currentDocData: any) => {
+            if (deviceVerified || !currentDocData) return;
             try {
+              deviceVerified = true;
               addLog("Verifying student device hardware ID and IP address...");
               const { getFingerprint, getPublicIP, getDeviceName } =
                 await import('../lib/deviceFingerprint');
               const [f, ip] = await Promise.all([getFingerprint(), getPublicIP(4000)]);
               addLog(`Fingerprint: ${f}, IP: ${ip}`);
               localStorage.setItem('fahmni_device_fingerprint', f);
-              const dev = (docData.devices || []) as any[];
+              const dev = (currentDocData.devices || []) as any[];
               const cur = dev.find((i) => i.id === f);
               const now = new Date().toISOString();
 
-              if (docData.accountStatus === 'blocked') {
+              if (currentDocData.accountStatus === 'blocked') {
                 addLog("Student account is BLOCKED!");
                 setAccountBlocked(true);
                 return;
@@ -277,7 +271,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
 
               if (!cur) {
-                const maxAllowed = docData.maxDevicesAllowed || 2;
+                const maxAllowed = currentDocData.maxDevicesAllowed || 2;
                 addLog(`New device detected. Total registered: ${dev.length}, Max allowed: ${maxAllowed}`);
                 if (dev.length >= maxAllowed) {
                   addLog("Device limit reached! Locking device access.");
@@ -304,14 +298,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
             } catch (secErr: any) {
               addLog(`⚠️ verifyStudentDevice error: ${secErr.message || secErr}`);
+              deviceVerified = false; // Reset on failure to retry
             }
           };
 
-          verifyStudentDevice();
+          addLog("User is student. Setting profile, checking grade selection...");
+          if (s.exists()) {
+            setProfile(p);
+            setNeedsGradeSelection(r === 'student' && (!docData.grade || !docData.level));
+            // Unblock the UI immediately after setting profile if document already exists
+            setLoading(false);
+            clearTimeout(forceUnfreeze);
+            verifyStudentDevice(docData);
+          }
 
           addLog("Setting up onSnapshot update listener for student user...");
           unsub = onSnapshot(docRef, (snap) => {
             addLog("onSnapshot update received for student profile");
+            const isRegisteringActive = sessionStorage.getItem('is_registering') === 'true';
             if (snap.exists()) {
               const d = snap.data();
               const nr = getResolvedRole(u.email, d.role);
@@ -324,7 +328,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               if (nr === 'student') setAccountBlocked(d.accountStatus === 'blocked');
               setLoading(false);
               clearTimeout(forceUnfreeze);
+              
+              // Verify device fingerprint once the document actually exists in Firestore
+              verifyStudentDevice(d);
             } else {
+              if (isRegisteringActive) {
+                addLog("onSnapshot: Student profile document does not exist yet, but user is actively registering. Deferring signout.");
+                return;
+              }
               addLog("onSnapshot: Student profile document deleted! Signing out...");
               signOut(currentAuth).catch((err) => console.error(err));
               setUser(null);
