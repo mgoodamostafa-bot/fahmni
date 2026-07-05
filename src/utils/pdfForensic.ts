@@ -74,7 +74,7 @@ export async function stampPDFWithForensics(
     const barcodeY = 35; // 35 units from the bottom
     
     // Extremely faint yellow color (completely invisible to human eye, but contrasty under blue-channel filter)
-    const barcodeColor = rgb(1.0, 1.0, 0.95);
+    const barcodeColor = rgb(1.0, 1.0, 0.92);
     // Generate bit array
     const paddedId = data.studentId.padStart(8, '0').slice(-8);
     const bits: number[] = [1, 0, 1]; // Start pattern

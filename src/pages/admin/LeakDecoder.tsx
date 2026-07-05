@@ -187,8 +187,8 @@ export const LeakDecoder: React.FC = () => {
       }
 
       // Number of samples along the scanline (proportional to distance)
-      const numSamples = Math.round(dist * 2);
-      const yellowValues: number[] = [];
+      const numSamples = Math.round(dist * 2.5);
+      const blueValues: number[] = [];
 
       for (let i = 0; i < numSamples; i++) {
         const t = i / (numSamples - 1);
@@ -197,40 +197,49 @@ export const LeakDecoder: React.FC = () => {
 
         if (sx >= 0 && sx < sampleCanvas.width && sy >= 0 && sy < sampleCanvas.height) {
           const idx = (sy * sampleCanvas.width + sx) * 4;
-          const r = data[idx];
-          const g = data[idx + 1];
-          const b = data[idx + 2];
-          
-          // Yellow metric: (Red + Green) - 2 * Blue
-          const yellowMetric = (r + g) - 2 * b;
-          yellowValues.push(yellowMetric > 0 ? yellowMetric : 0);
+          const b = data[idx + 2]; // Blue channel value
+          blueValues.push(b);
         } else {
-          yellowValues.push(0);
+          blueValues.push(255); // Default to white
         }
       }
 
-      // Smooth the signal using a moving average window to eliminate noise
-      const smoothed: number[] = [];
-      const windowSize = 3;
-      for (let i = 0; i < yellowValues.length; i++) {
+      // Smooth the signal using a moving average window to eliminate high-frequency noise
+      const smoothedBlue: number[] = [];
+      const smoothWindow = 2;
+      for (let i = 0; i < blueValues.length; i++) {
         let sum = 0;
         let count = 0;
-        for (let w = -windowSize; w <= windowSize; w++) {
-          if (i + w >= 0 && i + w < yellowValues.length) {
-            sum += yellowValues[i + w];
+        for (let w = -smoothWindow; w <= smoothWindow; w++) {
+          if (i + w >= 0 && i + w < blueValues.length) {
+            sum += blueValues[i + w];
             count++;
           }
         }
-        smoothed.push(sum / count);
+        smoothedBlue.push(sum / count);
       }
 
-      // Calculate dynamic threshold: 45% of maximum intensity
-      const maxVal = Math.max(...smoothed);
-      const minVal = Math.min(...smoothed);
-      const threshold = minVal + (maxVal - minVal) * 0.45;
+      // Apply Adaptive Local Thresholding:
+      // Compare each pixel's blue value with the local average in a wide neighborhood.
+      // This is extremely robust against shadows, gradients, and exposure variations.
+      const binary: number[] = [];
+      const localWindowSize = Math.max(5, Math.round(numSamples / 20)); // Local neighborhood window
 
-      // Binarize signal (1 = bar, 0 = space)
-      const binary = smoothed.map(val => (val > threshold ? 1 : 0));
+      for (let i = 0; i < smoothedBlue.length; i++) {
+        let localSum = 0;
+        let localCount = 0;
+        for (let w = -localWindowSize; w <= localWindowSize; w++) {
+          if (i + w >= 0 && i + w < smoothedBlue.length) {
+            localSum += smoothedBlue[i + w];
+            localCount++;
+          }
+        }
+        const localAvg = localSum / localCount;
+        
+        // If the blue value is locally lower (meaning more yellow/darker blue), it's classified as a bar!
+        // We set the sensitivity to 1.5 units difference
+        binary.push(smoothedBlue[i] < localAvg - 1.2 ? 1 : 0);
+      }
 
       // Find bars (run-length encoding of 1s)
       const runs: { start: number; end: number; width: number }[] = [];
