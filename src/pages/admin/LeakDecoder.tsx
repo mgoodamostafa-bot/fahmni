@@ -71,9 +71,9 @@ export const LeakDecoder: React.FC = () => {
         // Default handles based on image size
         const w = img.width;
         const h = img.height;
-        setPointA({ x: w * 0.5 - w * 0.05, y: h * 0.91 });
-        setPointB({ x: w * 0.5 + w * 0.05, y: h * 0.91 });
-        setPointC({ x: w * 0.5 - w * 0.05, y: h * 0.95 });
+        setPointA({ x: w * 0.44, y: h * 0.957 });
+        setPointB({ x: w * 0.56, y: h * 0.957 });
+        setPointC({ x: w * 0.5 - w * 0.05, y: h * 0.97 });
         setProcessing(false);
       };
     };
