@@ -83,6 +83,8 @@ export const CourseCard = React.memo<CourseCardProps>(({
   }, [course.id]);
   
   const subjectFallbacks: Record<string, string> = {
+    'العلوم المتكاملة': 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800&q=80',
+    'علوم متكاملة': 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800&q=80',
     'الفيزياء': 'https://images.unsplash.com/photo-1636466484294-4758b901f8a5?w=800&q=80',
     'فيزياء': 'https://images.unsplash.com/photo-1636466484294-4758b901f8a5?w=800&q=80',
     'الكيمياء': 'https://images.unsplash.com/photo-1532187863486-abf51ad982d7?w=800&q=80',
@@ -91,10 +93,16 @@ export const CourseCard = React.memo<CourseCardProps>(({
     'رياضيات': 'https://images.unsplash.com/photo-1509228468518-180dd482180c?w=800&q=80',
     'الأحياء': 'https://images.unsplash.com/photo-1530026405186-ed1b0ca67b0b?w=800&q=80',
     'أحياء': 'https://images.unsplash.com/photo-1530026405186-ed1b0ca67b0b?w=800&q=80',
+    'الجيولوجيا والعلوم البيئية': 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&q=80',
+    'جيولوجيا': 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&q=80',
     'اللغة العربية': 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=800&q=80',
     'لغة عربية': 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=800&q=80',
     'اللغة الإنجليزية': 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=800&q=80',
     'لغة إنجليزية': 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=800&q=80',
+    'الفلسفة والمنطق': 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=800&q=80',
+    'فلسفة': 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=800&q=80',
+    'علم النفس والاجتماع': 'https://images.unsplash.com/photo-1507537297725-24a1c029d3ca?w=800&q=80',
+    'علم نفس': 'https://images.unsplash.com/photo-1507537297725-24a1c029d3ca?w=800&q=80',
   };
 
   const getYouTubeThumbnail = (url?: string) => {

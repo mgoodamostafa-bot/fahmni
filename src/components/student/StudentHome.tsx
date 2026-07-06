@@ -313,12 +313,16 @@ export const StudentHome: React.FC = () => {
               <div className="relative w-full md:w-64 aspect-video rounded-2xl overflow-hidden shadow-lg">
                   <img 
                     src={lastLesson.courseThumbnail || lastLesson.thumbnailUrl || Object.entries({
+                      'العلوم المتكاملة': 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800&q=80',
                       'الفيزياء': 'https://images.unsplash.com/photo-1636466484294-4758b901f8a5?w=800&q=80',
                       'الكيمياء': 'https://images.unsplash.com/photo-1532187863486-abf51ad982d7?w=800&q=80',
                       'الرياضيات': 'https://images.unsplash.com/photo-1509228468518-180dd482180c?w=800&q=80',
                       'الأحياء': 'https://images.unsplash.com/photo-1530026405186-ed1b0ca67b0b?w=800&q=80',
+                      'الجيولوجيا': 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&q=80',
                       'اللغة العربية': 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=800&q=80',
                       'اللغة الإنجليزية': 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=800&q=80',
+                      'الفلسفة': 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=800&q=80',
+                      'علم النفس': 'https://images.unsplash.com/photo-1507537297725-24a1c029d3ca?w=800&q=80',
                     }).find(([k]) => lastLesson.subject?.includes(k))?.[1] || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&q=80'} 
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     alt="Course"
