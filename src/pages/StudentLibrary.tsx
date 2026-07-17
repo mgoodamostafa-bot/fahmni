@@ -55,6 +55,15 @@ export const StudentLibrary: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [stampingState, setStampingState] = useState<{
+    status: 'idle' | 'preparing' | 'ready' | 'error';
+    url?: string;
+    filename?: string;
+    error?: string;
+  } | null>(null);
+  const [showReader, setShowReader] = useState(false);
+  const [readerUrl, setReaderUrl] = useState('');
+  const [readerFilename, setReaderFilename] = useState('');
 
   useEffect(() => {
     if (!user) return;
@@ -199,7 +208,7 @@ export const StudentLibrary: React.FC = () => {
       return;
     }
 
-    setDownloading(id);
+    setStampingState({ status: 'preparing', url, filename: `${filename}.pdf` });
 
     try {
       let ipAddress = 'Local';
@@ -218,11 +227,19 @@ export const StudentLibrary: React.FC = () => {
                       `&id=${encodeURIComponent(profile.studentId || '000000')}` +
                       `&ip=${encodeURIComponent(ipAddress)}`;
 
-      // Open in a new tab synchronously (User-Initiated)
-      window.open(viewUrl, '_blank');
-    } catch (err) {
-      console.error('Failed to open PDF:', err);
-      window.open(url, '_blank');
+      setStampingState({
+        status: 'ready',
+        url: viewUrl,
+        filename: `${filename}.pdf`
+      });
+    } catch (err: any) {
+      console.error('Forensic preparation failed:', err);
+      setStampingState({
+        status: 'error',
+        url: url,
+        filename: `${filename}.pdf`,
+        error: err.message || String(err)
+      });
     } finally {
       setDownloading(null);
     }
@@ -456,6 +473,177 @@ export const StudentLibrary: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {stampingState && stampingState.status !== 'idle' && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" dir="rtl">
+          <div className="bg-space-900 border border-white/10 rounded-[2.5rem] p-8 max-w-md w-full text-center space-y-6 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-32 h-32 bg-brand-blue/5 blur-3xl -z-10" />
+            
+            {stampingState.status === 'preparing' && (
+              <div className="space-y-6">
+                <div className="w-20 h-20 bg-brand-blue/10 rounded-full flex items-center justify-center border border-brand-blue/20 mx-auto animate-pulse">
+                  <Loader2 className="w-10 h-10 text-brand-blue animate-spin" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-black text-white">جاري وسم الملف رقمياً</h3>
+                  <p className="text-gray-400 text-sm font-bold leading-relaxed">
+                    نقوم الآن بختم اسمك وبياناتك الشخصية لحماية حقوق المعلم. برجاء عدم إغلاق الصفحة...
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {stampingState.status === 'ready' && (
+              <div className="space-y-6">
+                <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center border border-emerald-500/20 mx-auto">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-black text-white">الملف جاهز للتحميل!</h3>
+                  <p className="text-gray-400 text-xs font-bold leading-relaxed">
+                    تم إعداد نسختك الشخصية الموثقة بنجاح. اختر الطريقة المناسبة لجهازك:
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2.5 max-h-[300px] overflow-y-auto pr-1">
+                  {/* Option 📲 Share API (Mobile native share sheet) */}
+                  {stampingState.url && stampingState.filename && typeof navigator !== 'undefined' && navigator.share && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          if (stampingState.url && stampingState.filename) {
+                            const response = await fetch(stampingState.url);
+                            const blob = await response.blob();
+                            const file = new File([blob], stampingState.filename, { type: 'application/pdf' });
+                            await navigator.share({
+                              files: [file],
+                              title: stampingState.filename,
+                            });
+                          }
+                        } catch (err) {
+                          console.warn('Share failed:', err);
+                        }
+                      }}
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-md text-xs"
+                    >
+                      <span>📲 مشاركة وحفظ (آيفون / أندرويد)</span>
+                    </button>
+                  )}
+
+                  {/* Option 📖 Inline PDF Reader */}
+                  <button
+                    onClick={() => {
+                      if (stampingState.url && stampingState.filename) {
+                        setReaderUrl(stampingState.url);
+                        setReaderFilename(stampingState.filename);
+                        setShowReader(true);
+                        setStampingState(null); // close modal
+                      }
+                    }}
+                    className="w-full bg-brand-blue hover:bg-brand-blue/80 text-white font-black py-3 rounded-2xl flex items-center justify-center gap-2 transition-all text-xs"
+                  >
+                    <span>📖 عرض وقراءة داخل الموقع (آمن 100%)</span>
+                  </button>
+
+                  {/* Option 🌐 Open in New Tab */}
+                  <button
+                    onClick={() => {
+                      if (stampingState.url) {
+                        window.open(stampingState.url, '_blank');
+                      }
+                    }}
+                    className="w-full bg-white/10 hover:bg-white/15 text-white font-black py-3 rounded-2xl flex items-center justify-center gap-2 transition-all text-xs"
+                  >
+                    <span>🌐 فتح وعرض في تبويب جديد</span>
+                  </button>
+
+                  {/* Option 💻 Simulated click (Desktop fallback) */}
+                  <button
+                    onClick={() => {
+                      if (stampingState.url && stampingState.filename) {
+                        const link = document.createElement('a');
+                        link.href = stampingState.url;
+                        link.download = stampingState.filename;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      }
+                    }}
+                    className="w-full bg-white/5 hover:bg-white/10 text-gray-300 font-bold py-2.5 rounded-2xl flex items-center justify-center gap-2 transition-all text-xs border border-white/5"
+                  >
+                    <span>💻 تحميل مباشر للكمبيوتر</span>
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => setStampingState(null)}
+                  className="w-full text-xs text-gray-500 hover:text-gray-400 font-bold transition-all pt-2"
+                >
+                  إلغاء وإغلاق
+                </button>
+              </div>
+            )}
+
+            {stampingState.status === 'error' && (
+              <div className="space-y-6">
+                <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/20 mx-auto">
+                  <AlertCircle className="w-10 h-10 text-red-400" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-black text-white">فشل التحميل الموثق</h3>
+                  <p className="text-gray-400 text-sm font-bold">حدث خطأ أثناء ختم النسخة الشخصية للملف.</p>
+                </div>
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={() => {
+                      setStampingState(null);
+                    }}
+                    className="w-full bg-white/10 hover:bg-white/20 text-white font-black py-3 rounded-2xl transition-all text-sm"
+                  >
+                    إعادة المحاولة
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (stampingState.url) {
+                        window.open(stampingState.url, '_blank');
+                      }
+                      setStampingState(null);
+                    }}
+                    className="w-full bg-brand-blue hover:bg-brand-blue/80 text-white font-black py-3 rounded-2xl transition-all text-sm"
+                  >
+                    تحميل مباشر (بدون ختم)
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* PDF Reader Overlay */}
+      {showReader && readerUrl && (
+        <div className="fixed inset-0 bg-[#0f172a] z-[100] flex flex-col" dir="rtl">
+          <div className="bg-space-900 border-b border-white/10 px-6 py-4 flex items-center justify-between">
+            <h3 className="text-base font-black text-white line-clamp-1">{readerFilename}</h3>
+            <button
+              onClick={() => {
+                setShowReader(false);
+                setReaderUrl('');
+              }}
+              className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 px-5 py-2.5 rounded-xl text-sm font-black transition-all"
+            >
+              إغلاق القارئ
+            </button>
+          </div>
+          <div className="flex-1 w-full bg-[#1e293b] relative">
+            <iframe
+              src={readerUrl}
+              className="w-full h-full border-0"
+              title="PDF Reader"
+            />
+          </div>
+        </div>
+      )}
 
     </div>
   );
