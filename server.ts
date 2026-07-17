@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { google } from 'googleapis';
+import { PDFDocument, rgb as pdfRgb, degrees as pdfDegrees } from 'pdf-lib';
 
 dotenv.config();
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
@@ -307,6 +308,162 @@ app.get('/api/download-proxy', async (req: any, res: any) => {
   } catch (error: any) {
     console.error('Proxy Download Error:', error);
     res.status(500).json({ error: error.message || 'Failed to download file through proxy' });
+  }
+});
+
+// Server-side Forensic Stamped PDF streaming
+app.get('/api/view-pdf', async (req: any, res: any) => {
+  const fileUrl = req.query.url;
+  const name = req.query.name || '';
+  const phone = req.query.phone || '';
+  const email = req.query.email || '';
+  const id = req.query.id || '';
+  const ip = req.query.ip || req.ip || '';
+
+  if (!fileUrl) {
+    res.status(400).json({ error: 'Missing url query parameter' });
+    return;
+  }
+
+  try {
+    let targetUrl = fileUrl;
+    let fileId: string | null = null;
+
+    if (fileUrl.includes('drive.google.com')) {
+      const match = fileUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || fileUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      if (match && match[1]) {
+        fileId = match[1];
+        targetUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+      }
+    }
+
+    let response;
+
+    if (fileId) {
+      const getRes = await fetch(targetUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      });
+
+      const contentType = getRes.headers.get('content-type') || '';
+
+      if (contentType.includes('text/html')) {
+        const cookies = getRes.headers.getSetCookie();
+        const warningCookie = cookies.find(c => c.includes('download_warning'));
+
+        if (warningCookie) {
+          const cookieString = warningCookie.split(';')[0];
+          response = await fetch(targetUrl, {
+            method: 'POST',
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Cookie': cookieString
+            }
+          });
+        } else {
+          response = getRes;
+        }
+      } else {
+        response = getRes;
+      }
+    } else {
+      response = await fetch(targetUrl);
+    }
+
+    if (!response.ok) {
+      res.status(response.status).json({ error: `Failed to fetch target file: ${response.statusText}` });
+      return;
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Validate PDF
+    const isValidPdf = buffer.length >= 5 &&
+      buffer[0] === 0x25 && // %
+      buffer[1] === 0x50 && // P
+      buffer[2] === 0x44 && // D
+      buffer[3] === 0x46 && // F
+      buffer[4] === 0x2D;   // -
+
+    if (!isValidPdf) {
+      res.setHeader('Content-Type', response.headers.get('content-type') || 'application/octet-stream');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.send(buffer);
+      return;
+    }
+
+    // Load PDF Document
+    const pdfDoc = await PDFDocument.load(buffer);
+    const pages = pdfDoc.getPages();
+
+    // Helper to sanitize
+    const sanitizeAscii = (str: string) => {
+      if (!str) return '';
+      return str.split('').filter(char => {
+        const code = char.charCodeAt(0);
+        return code >= 32 && code <= 126;
+      }).join('').trim();
+    };
+
+    const cleanName = sanitizeAscii(name);
+    const cleanPhone = sanitizeAscii(phone);
+    const cleanId = sanitizeAscii(id);
+    const cleanEmail = email ? sanitizeAscii(email) : cleanPhone;
+    const cleanIp = ip ? sanitizeAscii(ip) : '';
+    const dateText = new Date().toLocaleDateString('en-US');
+
+    const ipPart = cleanIp ? ` | IP: ${cleanIp}` : '';
+    const namePart = cleanName ? `${cleanName} | ` : '';
+    const visibleText = `ID: ${cleanId} | ${namePart}${cleanEmail}${ipPart} | Date: ${dateText}`;
+
+    pdfDoc.setTitle(`Forensic Copy - ID: ${cleanId}`);
+    pdfDoc.setAuthor('Fahmni Education Security');
+    pdfDoc.setSubject(`Licensed to: ${cleanEmail} (Tel: ${cleanPhone})`);
+    pdfDoc.setKeywords([`id:${cleanId}`, `email:${cleanEmail}`, `phone:${cleanPhone}`, `ip:${cleanIp}`]);
+
+    for (const page of pages) {
+      const { width, height } = page.getSize();
+      const fontColor = pdfRgb(0.65, 0.65, 0.65);
+      const opacity = 0.18;
+
+      const stepsX = 2;
+      const stepsY = 3;
+      for (let x = 1; x <= stepsX; x++) {
+        for (let y = 1; y <= stepsY; y++) {
+          const posX = (width / (stepsX + 1)) * x - 100;
+          const posY = (height / (stepsY + 1)) * y;
+
+          page.drawText(visibleText, {
+            x: posX,
+            y: posY,
+            size: 11,
+            color: fontColor,
+            opacity: opacity,
+            rotate: pdfDegrees(30),
+          });
+        }
+      }
+
+      // Invisible Forensic watermark
+      const hiddenText = `ID: ${cleanId} | ${cleanEmail}`;
+      page.drawText(hiddenText, {
+        x: width / 2 - 100,
+        y: 35,
+        size: 13,
+        color: pdfRgb(1.0, 1.0, 0.92),
+      });
+    }
+
+    const stampedPdfBytes = await pdfDoc.save();
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="licensed_document.pdf"');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.send(Buffer.from(stampedPdfBytes));
+  } catch (error: any) {
+    console.error('Server PDF stamping error:', error);
+    res.status(500).json({ error: error.message || 'Failed to stamp PDF' });
   }
 });
 
@@ -647,6 +804,273 @@ app.post('/api/exams/submit', async (req: any, res: any) => {
     res.json({ ...resultData, resultId: resultRef.id });
   } catch (err: any) {
     console.error('Exam submit error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────
+// WHATSAPP NOTIFICATION ENDPOINTS (Twilio)
+// ─────────────────────────────────────────────
+
+const sendWhatsAppMessage = async (to: string, body: string) => {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const fromNumber = process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+14155238886';
+
+  if (!accountSid || !authToken) {
+    console.warn('Twilio credentials not configured. WhatsApp message not sent.');
+    return { success: false, error: 'Twilio not configured' };
+  }
+
+  // Clean and format the phone number
+  let cleanedTo = to.replace(/[\s\-\(\)]/g, '');
+  if (!cleanedTo.startsWith('+')) {
+    // Assume Egyptian number if no country code
+    if (cleanedTo.startsWith('0')) cleanedTo = cleanedTo.substring(1);
+    cleanedTo = '+2' + cleanedTo;
+  }
+
+  try {
+    const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+    const params = new URLSearchParams({
+      To: `whatsapp:${cleanedTo}`,
+      From: fromNumber.startsWith('whatsapp:') ? fromNumber : `whatsapp:${fromNumber}`,
+      Body: body,
+    });
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64'),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Twilio WhatsApp Error:', data);
+      return { success: false, error: data.message || 'Failed to send' };
+    }
+
+    console.log(`WhatsApp sent to ${cleanedTo}: SID=${data.sid}`);
+    return { success: true, sid: data.sid };
+  } catch (err: any) {
+    console.error('WhatsApp send error:', err);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * POST /api/whatsapp/send
+ * Body: { to: string (phone), message: string, studentId?: string }
+ * Sends a custom WhatsApp message
+ */
+app.post('/api/whatsapp/send', async (req: any, res: any) => {
+  const { to, message, studentId } = req.body;
+
+  if (!to || !message) {
+    return res.status(400).json({ error: 'Missing required fields: to, message' });
+  }
+
+  const result = await sendWhatsAppMessage(to, message);
+
+  // Log the notification in Firestore
+  const adminDb = getAdminDb();
+  if (adminDb) {
+    try {
+      await adminDb.collection('whatsapp_logs').add({
+        to,
+        message,
+        studentId: studentId || null,
+        status: result.success ? 'sent' : 'failed',
+        error: result.error || null,
+        sid: result.success ? (result as any).sid : null,
+        sentAt: new Date().toISOString(),
+      });
+    } catch (logErr) {
+      console.error('Failed to log WhatsApp message:', logErr);
+    }
+  }
+
+  if (result.success) {
+    res.json({ success: true, sid: (result as any).sid });
+  } else {
+    res.status(500).json({ success: false, error: result.error });
+  }
+});
+
+/**
+ * POST /api/whatsapp/notify-result
+ * Body: { studentId: string, examTitle: string, score: number, total: number, percentage: number }
+ * Sends exam result notification to parent via WhatsApp
+ */
+app.post('/api/whatsapp/notify-result', async (req: any, res: any) => {
+  const { studentId, examTitle, score, total, percentage } = req.body;
+
+  if (!studentId) {
+    return res.status(400).json({ error: 'Missing studentId' });
+  }
+
+  const adminDb = getAdminDb();
+  if (!adminDb) return res.status(500).json({ error: 'DB error' });
+
+  try {
+    // Find student and parent phone
+    let studentDoc = await adminDb.collection('users').doc(studentId).get();
+    if (!studentDoc.exists) {
+      studentDoc = await adminDb.collection('center_students').doc(studentId).get();
+    }
+    if (!studentDoc.exists) return res.status(404).json({ error: 'Student not found' });
+
+    const studentData = studentDoc.data()!;
+    const parentPhone = studentData.fatherPhone || studentData.motherPhone;
+
+    if (!parentPhone) {
+      return res.status(400).json({ error: 'No parent phone number found for this student' });
+    }
+
+    const level = percentage >= 85 ? 'متفوق ⭐' : percentage >= 70 ? 'جيد جداً 👏' : percentage >= 55 ? 'جيد 👍' : percentage >= 40 ? 'متوسط ⚠️' : 'يحتاج تحسين 📚';
+
+    const message = `📋 *نتيجة اختبار جديدة*\n\n` +
+      `👤 الطالب: ${studentData.displayName || 'طالب'}\n` +
+      `📝 الاختبار: ${examTitle || 'غير محدد'}\n` +
+      `✅ النتيجة: ${score || 0} / ${total || 0}\n` +
+      `📊 النسبة: ${percentage || 0}%\n` +
+      `🏆 المستوى: ${level}\n\n` +
+      `_هذه رسالة تلقائية من المنصة التعليمية_`;
+
+    const result = await sendWhatsAppMessage(parentPhone, message);
+
+    // Log
+    await adminDb.collection('whatsapp_logs').add({
+      to: parentPhone,
+      type: 'exam_result',
+      studentId,
+      message,
+      status: result.success ? 'sent' : 'failed',
+      sentAt: new Date().toISOString(),
+    });
+
+    res.json({ success: result.success, parentPhone });
+  } catch (err: any) {
+    console.error('WhatsApp notify-result error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/whatsapp/notify-attendance
+ * Body: { studentId: string, date: string, status: 'present'|'absent'|'late'|'excused' }
+ * Sends attendance notification to parent via WhatsApp
+ */
+app.post('/api/whatsapp/notify-attendance', async (req: any, res: any) => {
+  const { studentId, date, status } = req.body;
+
+  if (!studentId || !status) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  const adminDb = getAdminDb();
+  if (!adminDb) return res.status(500).json({ error: 'DB error' });
+
+  try {
+    let studentDoc = await adminDb.collection('users').doc(studentId).get();
+    if (!studentDoc.exists) {
+      studentDoc = await adminDb.collection('center_students').doc(studentId).get();
+    }
+    if (!studentDoc.exists) return res.status(404).json({ error: 'Student not found' });
+
+    const studentData = studentDoc.data()!;
+    const parentPhone = studentData.fatherPhone || studentData.motherPhone;
+
+    if (!parentPhone) {
+      return res.status(400).json({ error: 'No parent phone number found' });
+    }
+
+    const statusMap: Record<string, string> = {
+      'present': '✅ حاضر',
+      'absent': '❌ غائب',
+      'late': '⚠️ متأخر',
+      'excused': '📋 مستأذن',
+    };
+
+    const statusText = statusMap[status] || status;
+
+    const message = `📢 *إشعار حضور*\n\n` +
+      `👤 الطالب: ${studentData.displayName || 'طالب'}\n` +
+      `📅 التاريخ: ${date || new Date().toLocaleDateString('ar-EG')}\n` +
+      `📌 الحالة: ${statusText}\n\n` +
+      `_هذه رسالة تلقائية من المنصة التعليمية_`;
+
+    const result = await sendWhatsAppMessage(parentPhone, message);
+
+    await adminDb.collection('whatsapp_logs').add({
+      to: parentPhone,
+      type: 'attendance',
+      studentId,
+      status,
+      message,
+      result: result.success ? 'sent' : 'failed',
+      sentAt: new Date().toISOString(),
+    });
+
+    res.json({ success: result.success, parentPhone });
+  } catch (err: any) {
+    console.error('WhatsApp notify-attendance error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/whatsapp/send-custom
+ * Body: { studentId: string, message: string }
+ * Teacher sends a custom WhatsApp message to a student's parent
+ */
+app.post('/api/whatsapp/send-custom', async (req: any, res: any) => {
+  const { studentId, message } = req.body;
+
+  if (!studentId || !message) {
+    return res.status(400).json({ error: 'Missing studentId or message' });
+  }
+
+  const adminDb = getAdminDb();
+  if (!adminDb) return res.status(500).json({ error: 'DB error' });
+
+  try {
+    let studentDoc = await adminDb.collection('users').doc(studentId).get();
+    if (!studentDoc.exists) {
+      studentDoc = await adminDb.collection('center_students').doc(studentId).get();
+    }
+    if (!studentDoc.exists) return res.status(404).json({ error: 'Student not found' });
+
+    const studentData = studentDoc.data()!;
+    const parentPhone = studentData.fatherPhone || studentData.motherPhone;
+
+    if (!parentPhone) {
+      return res.status(400).json({ error: 'No parent phone number found' });
+    }
+
+    const fullMessage = `💬 *رسالة من المعلم*\n\n` +
+      `👤 بخصوص الطالب: ${studentData.displayName || 'طالب'}\n\n` +
+      `${message}\n\n` +
+      `_هذه رسالة من المنصة التعليمية_`;
+
+    const result = await sendWhatsAppMessage(parentPhone, fullMessage);
+
+    await adminDb.collection('whatsapp_logs').add({
+      to: parentPhone,
+      type: 'custom',
+      studentId,
+      message: fullMessage,
+      status: result.success ? 'sent' : 'failed',
+      sentAt: new Date().toISOString(),
+    });
+
+    res.json({ success: result.success, parentPhone });
+  } catch (err: any) {
+    console.error('WhatsApp send-custom error:', err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -55,12 +55,6 @@ export const StudentLibrary: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
-  const [stampingState, setStampingState] = useState<{
-    status: 'idle' | 'preparing' | 'ready' | 'error';
-    url?: string;
-    filename?: string;
-    error?: string;
-  } | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -205,7 +199,7 @@ export const StudentLibrary: React.FC = () => {
       return;
     }
 
-    setStampingState({ status: 'preparing', url, filename: `${filename}.pdf` });
+    setDownloading(id);
 
     try {
       let ipAddress = 'Local';
@@ -216,40 +210,21 @@ export const StudentLibrary: React.FC = () => {
         console.warn('Could not fetch public IP for watermark', e);
       }
 
-      // Bypass CORS for external links by routing through our backend download proxy
-      const fetchUrl = url.includes('drive.google.com') || url.includes('dropbox.com')
-        ? `/api/download-proxy?url=${encodeURIComponent(url)}`
-        : url;
+      // Generate the server-side PDF watermarking URL
+      const viewUrl = `/api/view-pdf?url=${encodeURIComponent(url)}` +
+                      `&name=${encodeURIComponent(profile.displayName || '')}` +
+                      `&phone=${encodeURIComponent(profile.studentPhone || profile.email || '')}` +
+                      `&email=${encodeURIComponent(profile.email || '')}` +
+                      `&id=${encodeURIComponent(profile.studentId || '000000')}` +
+                      `&ip=${encodeURIComponent(ipAddress)}`;
 
-      const response = await fetch(fetchUrl);
-      if (!response.ok) throw new Error('Failed to fetch PDF file');
-      const arrayBuffer = await response.arrayBuffer();
-
-      const { stampPDFWithForensics } = await import('../utils/pdfForensic');
-      const stampedBytes = await stampPDFWithForensics(arrayBuffer, {
-        studentName: profile.displayName,
-        studentPhone: profile.studentPhone || profile.email,
-        studentEmail: profile.email,
-        studentId: profile.studentId || '000000',
-        ipAddress,
-      });
-
-      const blob = new Blob([stampedBytes], { type: 'application/pdf' });
-      const downloadUrl = URL.createObjectURL(blob);
-
-      setStampingState({
-        status: 'ready',
-        url: downloadUrl,
-        filename: `${filename}.pdf`
-      });
-    } catch (err: any) {
-      console.error('Forensic download failed:', err);
-      setStampingState({
-        status: 'error',
-        url: url,
-        filename: `${filename}.pdf`,
-        error: err.message || String(err)
-      });
+      // Open in a new tab synchronously (User-Initiated)
+      window.open(viewUrl, '_blank');
+    } catch (err) {
+      console.error('Failed to open PDF:', err);
+      window.open(url, '_blank');
+    } finally {
+      setDownloading(null);
     }
   };
 
@@ -482,93 +457,6 @@ export const StudentLibrary: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {stampingState && stampingState.status !== 'idle' && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" dir="rtl">
-          <div className="bg-space-900 border border-white/10 rounded-[2.5rem] p-8 max-w-md w-full text-center space-y-6 shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-32 h-32 bg-brand-blue/5 blur-3xl -z-10" />
-            
-            {stampingState.status === 'preparing' && (
-              <div className="space-y-6">
-                <div className="w-20 h-20 bg-brand-blue/10 rounded-full flex items-center justify-center border border-brand-blue/20 mx-auto animate-pulse">
-                  <Loader2 className="w-10 h-10 text-brand-blue animate-spin" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-xl font-black text-white">جاري وسم الملف رقمياً</h3>
-                  <p className="text-gray-400 text-sm font-bold leading-relaxed">
-                    نقوم الآن بختم اسمك وبياناتك الشخصية لحماية حقوق المعلم. برجاء عدم إغلاق الصفحة...
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {stampingState.status === 'ready' && (
-              <div className="space-y-6">
-                <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center border border-emerald-500/20 mx-auto">
-                  <CheckCircle2 className="w-10 h-10 text-emerald-400" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-xl font-black text-white">الملف جاهز للتحميل!</h3>
-                  <p className="text-gray-400 text-sm font-bold">تم إعداد نسختك الشخصية الموثقة بنجاح.</p>
-                </div>
-                <button
-                  onClick={() => {
-                    if (stampingState.url && stampingState.filename) {
-                      if (isMobileDevice()) {
-                        window.open(stampingState.url, '_blank');
-                      } else {
-                        const link = document.createElement('a');
-                        link.href = stampingState.url;
-                        link.download = stampingState.filename;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                      }
-                    }
-                    setStampingState(null);
-                  }}
-                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg text-sm"
-                >
-                  <Download size={18} />
-                  <span>عرض وتحميل الملف الآن</span>
-                </button>
-              </div>
-            )}
-
-            {stampingState.status === 'error' && (
-              <div className="space-y-6">
-                <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/20 mx-auto">
-                  <AlertCircle className="w-10 h-10 text-red-400" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-xl font-black text-white">فشل التحميل الموثق</h3>
-                  <p className="text-gray-400 text-sm font-bold">حدث خطأ أثناء ختم النسخة الشخصية للملف.</p>
-                </div>
-                <div className="flex flex-col gap-3">
-                  <button
-                    onClick={() => {
-                      setStampingState(null);
-                    }}
-                    className="w-full bg-white/10 hover:bg-white/20 text-white font-black py-3 rounded-2xl transition-all text-sm"
-                  >
-                    إعادة المحاولة
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (stampingState.url) {
-                        window.open(stampingState.url, '_blank');
-                      }
-                      setStampingState(null);
-                    }}
-                    className="w-full bg-brand-blue hover:bg-brand-blue/80 text-white font-black py-3 rounded-2xl transition-all text-sm"
-                  >
-                    تحميل مباشر (بدون ختم)
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };
