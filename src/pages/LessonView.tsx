@@ -51,6 +51,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, getTenantDb, storage } from '../lib/firebase';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { encryptUrl } from '../utils/crypto';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -227,10 +228,14 @@ export const LessonView: React.FC = () => {
   const handleDownloadBooklet = async () => {
     if (!currentLesson?.pdfUrl) return;
     setDownloadingBooklet(true);
+    let mobileWindow: Window | null = null;
     try {
       const url = currentLesson.pdfUrl;
       const filename = currentLesson.title || 'ملخص الحصة';
       
+      const { downloadViaProxy, isMobileDevice } = await import('../utils/download');
+      const isMobile = isMobileDevice();
+
       const isPdf =
         url.toLowerCase().includes('.pdf') ||
         url.toLowerCase().includes('/o/portfolioresources') ||
@@ -239,6 +244,51 @@ export const LessonView: React.FC = () => {
         url.toLowerCase().includes('dropbox.com');
 
       if (isPdf && profile) {
+        if (isMobile) {
+          mobileWindow = window.open('about:blank', '_blank');
+          if (mobileWindow) {
+            mobileWindow.document.write(`
+              <html dir="rtl">
+                <head>
+                  <title>جاري تجهيز الملف...</title>
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                  <style>
+                    body {
+                      background-color: #0f172a;
+                      color: white;
+                      font-family: system-ui, -apple-system, sans-serif;
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      justify-content: center;
+                      height: 100vh;
+                      margin: 0;
+                      text-align: center;
+                    }
+                    .spinner {
+                      border: 4px solid rgba(255,255,255,0.1);
+                      width: 50px;
+                      height: 50px;
+                      border-radius: 50%;
+                      border-left-color: #38bdf8;
+                      animation: spin 1s linear infinite;
+                      margin-bottom: 20px;
+                    }
+                    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                    h2 { margin: 0 0 10px 0; font-size: 1.2rem; font-weight: 800; }
+                    p { color: #94a3b8; font-size: 0.9rem; margin: 0; font-weight: 600; }
+                  </style>
+                </head>
+                <body>
+                  <div class="spinner"></div>
+                  <h2>جاري تجهيز كتابك التعليمي الموثق...</h2>
+                  <p>برجاء الانتظار ثوانٍ معدودة، سيفتح الملف تلقائياً.</p>
+                </body>
+              </html>
+            `);
+          }
+        }
+
         let ipAddress = 'Local';
         try {
           const { getPublicIP } = await import('../lib/deviceFingerprint');
@@ -256,6 +306,19 @@ export const LessonView: React.FC = () => {
         if (!response.ok) throw new Error('Failed to fetch PDF file');
         const arrayBuffer = await response.arrayBuffer();
 
+        // Validate the fetched content is actually a PDF before watermarking
+        const { isValidPdfBuffer } = await import('../utils/pdfForensic');
+        if (!isValidPdfBuffer(arrayBuffer)) {
+          console.warn('Fetched content is not a valid PDF, opening directly.');
+          if (mobileWindow) {
+            mobileWindow.location.href = url;
+          } else {
+            window.open(url, '_blank');
+          }
+          setDownloadingBooklet(false);
+          return;
+        }
+
         const { stampPDFWithForensics } = await import('../utils/pdfForensic');
         const stampedBytes = await stampPDFWithForensics(arrayBuffer, {
           studentName: profile.displayName,
@@ -267,21 +330,33 @@ export const LessonView: React.FC = () => {
 
         const blob = new Blob([stampedBytes], { type: 'application/pdf' });
         const downloadUrl = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = downloadUrl;
-        link.download = `${filename}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(downloadUrl);
+
+        if (mobileWindow) {
+          mobileWindow.location.href = downloadUrl;
+          setTimeout(() => {
+            URL.revokeObjectURL(downloadUrl);
+          }, 10000);
+        } else {
+          const link = document.createElement('a');
+          link.href = downloadUrl;
+          link.download = `${filename}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => {
+            URL.revokeObjectURL(downloadUrl);
+          }, 10000);
+        }
       } else {
-        const { downloadViaProxy } = await import('../utils/download');
         await downloadViaProxy(url, `${filename}.pdf`);
       }
     } catch (err: any) {
       console.error('Forensic download failed, falling back to direct tab open:', err);
-      alert(`عذراً، فشل التحميل الآمن للبصمة المائية بسبب: ${err.message || err}\nسيتم فتح الملف مباشرة كبديل.`);
-      window.open(currentLesson.pdfUrl, '_blank');
+      if (mobileWindow) {
+        mobileWindow.location.href = currentLesson.pdfUrl;
+      } else {
+        window.open(currentLesson.pdfUrl, '_blank');
+      }
     } finally {
       setDownloadingBooklet(false);
     }
@@ -590,6 +665,30 @@ export const LessonView: React.FC = () => {
 
           if (isMajorMilestone) {
             updateData.isCompleted = true;
+          }
+
+          if (isSupabaseConfigured() && supabase) {
+            try {
+              const { error } = await supabase.from('video_progress_logs').insert({
+                id: progressId,
+                user_id: updateData.userId,
+                course_id: updateData.courseId,
+                lesson_id: updateData.lessonId,
+                progress: updateData.progress,
+                is_completed: !!updateData.isCompleted,
+                last_viewed_at: updateData.lastViewedAt,
+              });
+              if (error) {
+                // If exists, update
+                await supabase.from('video_progress_logs').update({
+                  progress: updateData.progress,
+                  is_completed: !!updateData.isCompleted,
+                  last_viewed_at: updateData.lastViewedAt,
+                }).eq('id', progressId);
+              }
+            } catch (sErr) {
+              console.warn('⚡ [LessonView] Supabase progress log warning:', sErr);
+            }
           }
 
           await setDoc(progressRef, updateData, { merge: true });

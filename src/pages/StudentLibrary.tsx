@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { smartGetDocs, chunkArray } from '../utils/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FileTypeIcon } from '../components/FileTypeIcon';
-import { downloadViaProxy } from '../utils/download';
+import { downloadViaProxy, isMobileDevice } from '../utils/download';
 import {
   FileText,
   Search,
@@ -178,6 +178,9 @@ export const StudentLibrary: React.FC = () => {
 
   const handleDownload = async (url: string, filename: string, id: string) => {
     setDownloading(id);
+    const isMobile = isMobileDevice();
+    let mobileWindow: Window | null = null;
+
     try {
       const isPdf =
         url.toLowerCase().includes('.pdf') ||
@@ -187,6 +190,51 @@ export const StudentLibrary: React.FC = () => {
         url.toLowerCase().includes('dropbox.com');
 
       if (isPdf && profile) {
+        if (isMobile) {
+          mobileWindow = window.open('about:blank', '_blank');
+          if (mobileWindow) {
+            mobileWindow.document.write(`
+              <html dir="rtl">
+                <head>
+                  <title>جاري تجهيز الملف...</title>
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                  <style>
+                    body {
+                      background-color: #0f172a;
+                      color: white;
+                      font-family: system-ui, -apple-system, sans-serif;
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      justify-content: center;
+                      height: 100vh;
+                      margin: 0;
+                      text-align: center;
+                    }
+                    .spinner {
+                      border: 4px solid rgba(255,255,255,0.1);
+                      width: 50px;
+                      height: 50px;
+                      border-radius: 50%;
+                      border-left-color: #38bdf8;
+                      animation: spin 1s linear infinite;
+                      margin-bottom: 20px;
+                    }
+                    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                    h2 { margin: 0 0 10px 0; font-size: 1.2rem; font-weight: 800; }
+                    p { color: #94a3b8; font-size: 0.9rem; margin: 0; font-weight: 600; }
+                  </style>
+                </head>
+                <body>
+                  <div class="spinner"></div>
+                  <h2>جاري تجهيز كتابك التعليمي الموثق...</h2>
+                  <p>برجاء الانتظار ثوانٍ معدودة، سيفتح الملف تلقائياً.</p>
+                </body>
+              </html>
+            `);
+          }
+        }
+
         let ipAddress = 'Local';
         try {
           const { getPublicIP } = await import('../lib/deviceFingerprint');
@@ -215,20 +263,33 @@ export const StudentLibrary: React.FC = () => {
 
         const blob = new Blob([stampedBytes], { type: 'application/pdf' });
         const downloadUrl = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = downloadUrl;
-        link.download = `${filename}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(downloadUrl);
+
+        if (mobileWindow) {
+          mobileWindow.location.href = downloadUrl;
+          setTimeout(() => {
+            URL.revokeObjectURL(downloadUrl);
+          }, 10000);
+        } else {
+          const link = document.createElement('a');
+          link.href = downloadUrl;
+          link.download = `${filename}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => {
+            URL.revokeObjectURL(downloadUrl);
+          }, 10000);
+        }
       } else {
         await downloadViaProxy(url, `${filename}.pdf`);
       }
     } catch (err: any) {
       console.error('Forensic download failed, falling back to direct tab open:', err);
-      alert(`عذراً، فشل التحميل الآمن للبصمة المائية بسبب: ${err.message || err}\nسيتم فتح الملف مباشرة كبديل.`);
-      window.open(url, '_blank');
+      if (mobileWindow) {
+        mobileWindow.location.href = url;
+      } else {
+        window.open(url, '_blank');
+      }
     } finally {
       setDownloading(null);
     }

@@ -75,9 +75,25 @@ export const getMimeType = (extension: string): string => {
   return mimeTypes[extension] || 'application/octet-stream';
 };
 
+// Detect if the device is a mobile browser
+export const isMobileDevice = (): boolean => {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent || navigator.vendor || (window as any).opera
+  );
+};
+
 // Download file with progress tracking
 export const downloadFile = async (url: string, options: DownloadOptions = {}): Promise<void> => {
   const { filename, onProgress, onComplete, onError, signal } = options;
+
+  if (isMobileDevice()) {
+    window.open(url, '_blank');
+    if (onComplete) {
+      onComplete(new Blob());
+    }
+    return;
+  }
 
   try {
     const response = await fetch(url, { signal });
@@ -151,7 +167,10 @@ export const downloadFile = async (url: string, options: DownloadOptions = {}): 
     link.click();
     document.body.removeChild(link);
 
-    URL.revokeObjectURL(downloadUrl);
+    // Delay revocation to prevent race condition in Chrome/Safari
+    setTimeout(() => {
+      URL.revokeObjectURL(downloadUrl);
+    }, 10000);
 
     if (onComplete) {
       onComplete(blob);
@@ -182,6 +201,11 @@ export const downloadViaProxy = async (
   filename?: string,
   onProgress?: (progress: DownloadProgress) => void
 ): Promise<void> => {
+  if (isMobileDevice()) {
+    window.open(fileUrl, '_blank');
+    return;
+  }
+
   try {
     // Handle Google Drive Links
     if (fileUrl.includes('drive.google.com')) {
