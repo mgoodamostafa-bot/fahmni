@@ -58,6 +58,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { useTenant } from '../contexts/TenantContext';
 import { Quiz } from '../components/Quiz';
 import { CourseDiscussions } from '../components/CourseDiscussions';
+import { isMobileDevice } from '../utils/download';
 import { LessonSkeleton } from '../components/Skeleton';
 import { FahmniPlayer } from '../components/FahmniPlayer';
 import { CertificateGenerator } from '../components/CertificateGenerator';
@@ -225,138 +226,97 @@ export const LessonView: React.FC = () => {
   };
 
   const [downloadingBooklet, setDownloadingBooklet] = useState(false);
+  const [stampingState, setStampingState] = useState<{
+    status: 'idle' | 'preparing' | 'ready' | 'error';
+    url?: string;
+    filename?: string;
+    error?: string;
+  } | null>(null);
   const handleDownloadBooklet = async () => {
     if (!currentLesson?.pdfUrl) return;
-    setDownloadingBooklet(true);
-    let mobileWindow: Window | null = null;
-    try {
-      const url = currentLesson.pdfUrl;
-      const filename = currentLesson.title || 'ملخص الحصة';
-      
-      const { downloadViaProxy, isMobileDevice } = await import('../utils/download');
-      const isMobile = isMobileDevice();
+    
+    const url = currentLesson.pdfUrl;
+    const filename = currentLesson.title || 'ملخص الحصة';
+    
+    const { downloadViaProxy, isMobileDevice } = await import('../utils/download');
 
-      const isPdf =
-        url.toLowerCase().includes('.pdf') ||
-        url.toLowerCase().includes('/o/portfolioresources') ||
-        url.toLowerCase().includes('/o/lessons') ||
-        url.toLowerCase().includes('drive.google.com') ||
-        url.toLowerCase().includes('dropbox.com');
+    const isPdf =
+      url.toLowerCase().includes('.pdf') ||
+      url.toLowerCase().includes('/o/portfolioresources') ||
+      url.toLowerCase().includes('/o/lessons') ||
+      url.toLowerCase().includes('drive.google.com') ||
+      url.toLowerCase().includes('dropbox.com');
 
-      if (isPdf && profile) {
-        if (isMobile) {
-          mobileWindow = window.open('about:blank', '_blank');
-          if (mobileWindow) {
-            mobileWindow.document.write(`
-              <html dir="rtl">
-                <head>
-                  <title>جاري تجهيز الملف...</title>
-                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                  <style>
-                    body {
-                      background-color: #0f172a;
-                      color: white;
-                      font-family: system-ui, -apple-system, sans-serif;
-                      display: flex;
-                      flex-direction: column;
-                      align-items: center;
-                      justify-content: center;
-                      height: 100vh;
-                      margin: 0;
-                      text-align: center;
-                    }
-                    .spinner {
-                      border: 4px solid rgba(255,255,255,0.1);
-                      width: 50px;
-                      height: 50px;
-                      border-radius: 50%;
-                      border-left-color: #38bdf8;
-                      animation: spin 1s linear infinite;
-                      margin-bottom: 20px;
-                    }
-                    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-                    h2 { margin: 0 0 10px 0; font-size: 1.2rem; font-weight: 800; }
-                    p { color: #94a3b8; font-size: 0.9rem; margin: 0; font-weight: 600; }
-                  </style>
-                </head>
-                <body>
-                  <div class="spinner"></div>
-                  <h2>جاري تجهيز كتابك التعليمي الموثق...</h2>
-                  <p>برجاء الانتظار ثوانٍ معدودة، سيفتح الملف تلقائياً.</p>
-                </body>
-              </html>
-            `);
-          }
-        }
-
-        let ipAddress = 'Local';
-        try {
-          const { getPublicIP } = await import('../lib/deviceFingerprint');
-          ipAddress = await getPublicIP(2000);
-        } catch (e) {
-          console.warn('Could not fetch public IP for watermark', e);
-        }
-
-        // Bypass CORS for external links by routing through our backend download proxy
-        const fetchUrl = url.includes('drive.google.com') || url.includes('dropbox.com')
-          ? `/api/download-proxy?url=${encodeURIComponent(url)}`
-          : url;
-
-        const response = await fetch(fetchUrl);
-        if (!response.ok) throw new Error('Failed to fetch PDF file');
-        const arrayBuffer = await response.arrayBuffer();
-
-        // Validate the fetched content is actually a PDF before watermarking
-        const { isValidPdfBuffer } = await import('../utils/pdfForensic');
-        if (!isValidPdfBuffer(arrayBuffer)) {
-          console.warn('Fetched content is not a valid PDF, opening directly.');
-          if (mobileWindow) {
-            mobileWindow.location.href = url;
-          } else {
-            window.open(url, '_blank');
-          }
-          setDownloadingBooklet(false);
-          return;
-        }
-
-        const { stampPDFWithForensics } = await import('../utils/pdfForensic');
-        const stampedBytes = await stampPDFWithForensics(arrayBuffer, {
-          studentName: profile.displayName,
-          studentPhone: profile.studentPhone || profile.email,
-          studentEmail: profile.email,
-          studentId: profile.studentId || '000000',
-          ipAddress,
-        });
-
-        const blob = new Blob([stampedBytes], { type: 'application/pdf' });
-        const downloadUrl = URL.createObjectURL(blob);
-
-        if (mobileWindow) {
-          mobileWindow.location.href = downloadUrl;
-          setTimeout(() => {
-            URL.revokeObjectURL(downloadUrl);
-          }, 10000);
-        } else {
-          const link = document.createElement('a');
-          link.href = downloadUrl;
-          link.download = `${filename}.pdf`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          setTimeout(() => {
-            URL.revokeObjectURL(downloadUrl);
-          }, 10000);
-        }
-      } else {
+    if (!isPdf || !profile) {
+      setDownloadingBooklet(true);
+      try {
         await downloadViaProxy(url, `${filename}.pdf`);
+      } catch (err) {
+        console.error(err);
+        window.open(url, '_blank');
+      } finally {
+        setDownloadingBooklet(false);
       }
+      return;
+    }
+
+    setStampingState({ status: 'preparing', url, filename: `${filename}.pdf` });
+
+    try {
+      let ipAddress = 'Local';
+      try {
+        const { getPublicIP } = await import('../lib/deviceFingerprint');
+        ipAddress = await getPublicIP(2000);
+      } catch (e) {
+        console.warn('Could not fetch public IP for watermark', e);
+      }
+
+      // Bypass CORS for external links by routing through our backend download proxy
+      const fetchUrl = url.includes('drive.google.com') || url.includes('dropbox.com')
+        ? `/api/download-proxy?url=${encodeURIComponent(url)}`
+        : url;
+
+      const response = await fetch(fetchUrl);
+      if (!response.ok) throw new Error('Failed to fetch PDF file');
+      const arrayBuffer = await response.arrayBuffer();
+
+      // Validate the fetched content is actually a PDF before watermarking
+      const { isValidPdfBuffer } = await import('../utils/pdfForensic');
+      if (!isValidPdfBuffer(arrayBuffer)) {
+        console.warn('Fetched content is not a valid PDF, opening directly.');
+        setStampingState({
+          status: 'ready',
+          url: url,
+          filename: `${filename}.pdf`
+        });
+        return;
+      }
+
+      const { stampPDFWithForensics } = await import('../utils/pdfForensic');
+      const stampedBytes = await stampPDFWithForensics(arrayBuffer, {
+        studentName: profile.displayName,
+        studentPhone: profile.studentPhone || profile.email,
+        studentEmail: profile.email,
+        studentId: profile.studentId || '000000',
+        ipAddress,
+      });
+
+      const blob = new Blob([stampedBytes], { type: 'application/pdf' });
+      const downloadUrl = URL.createObjectURL(blob);
+
+      setStampingState({
+        status: 'ready',
+        url: downloadUrl,
+        filename: `${filename}.pdf`
+      });
     } catch (err: any) {
-      console.error('Forensic download failed, falling back to direct tab open:', err);
-      if (mobileWindow) {
-        mobileWindow.location.href = currentLesson.pdfUrl;
-      } else {
-        window.open(currentLesson.pdfUrl, '_blank');
-      }
+      console.error('Forensic download failed:', err);
+      setStampingState({
+        status: 'error',
+        url: url,
+        filename: `${filename}.pdf`,
+        error: err.message || String(err)
+      });
     } finally {
       setDownloadingBooklet(false);
     }
@@ -1923,7 +1883,93 @@ export const LessonView: React.FC = () => {
         )}
       </AnimatePresence>
 
+      {stampingState && stampingState.status !== 'idle' && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" dir="rtl">
+          <div className="bg-space-900 border border-white/10 rounded-[2.5rem] p-8 max-w-md w-full text-center space-y-6 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-32 h-32 bg-brand-blue/5 blur-3xl -z-10" />
+            
+            {stampingState.status === 'preparing' && (
+              <div className="space-y-6">
+                <div className="w-20 h-20 bg-brand-blue/10 rounded-full flex items-center justify-center border border-brand-blue/20 mx-auto animate-pulse">
+                  <Loader2 className="w-10 h-10 text-brand-blue animate-spin" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-black text-white">جاري وسم الملف رقمياً</h3>
+                  <p className="text-gray-400 text-sm font-bold leading-relaxed">
+                    نقوم الآن بختم اسمك وبياناتك الشخصية لحماية حقوق المعلم. برجاء عدم إغلاق الصفحة...
+                  </p>
+                </div>
+              </div>
+            )}
 
+            {stampingState.status === 'ready' && (
+              <div className="space-y-6">
+                <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center border border-emerald-500/20 mx-auto">
+                  <CheckCircle2 className="w-10 h-10 text-emerald-400" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-black text-white">الملف جاهز للتحميل!</h3>
+                  <p className="text-gray-400 text-sm font-bold">تم إعداد نسختك الشخصية الموثقة بنجاح.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (stampingState.url && stampingState.filename) {
+                      if (isMobileDevice()) {
+                        window.open(stampingState.url, '_blank');
+                      } else {
+                        const link = document.createElement('a');
+                        link.href = stampingState.url;
+                        link.download = stampingState.filename;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      }
+                    }
+                    setStampingState(null);
+                  }}
+                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg text-sm"
+                >
+                  <Download size={18} />
+                  <span>عرض وتحميل الملف الآن</span>
+                </button>
+              </div>
+            )}
+
+            {stampingState.status === 'error' && (
+              <div className="space-y-6">
+                <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/20 mx-auto">
+                  <AlertCircle className="w-10 h-10 text-red-400" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-black text-white">فشل التحميل الموثق</h3>
+                  <p className="text-gray-400 text-sm font-bold">حدث خطأ أثناء ختم النسخة الشخصية للملف.</p>
+                </div>
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={() => {
+                      setStampingState(null);
+                    }}
+                    className="w-full bg-white/10 hover:bg-white/20 text-white font-black py-3 rounded-2xl transition-all text-sm"
+                  >
+                    إعادة المحاولة
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (stampingState.url) {
+                        window.open(stampingState.url, '_blank');
+                      }
+                      setStampingState(null);
+                    }}
+                    className="w-full bg-brand-blue hover:bg-brand-blue/80 text-white font-black py-3 rounded-2xl transition-all text-sm"
+                  >
+                    تحميل مباشر (بدون ختم)
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
