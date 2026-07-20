@@ -219,17 +219,10 @@ export const StudentLibrary: React.FC = () => {
         console.warn('Could not fetch public IP for watermark', e);
       }
 
-      // Generate the server-side PDF watermarking URL
-      const viewUrl = `/api/view-pdf?url=${encodeURIComponent(url)}` +
-                      `&name=${encodeURIComponent(profile.displayName || '')}` +
-                      `&phone=${encodeURIComponent(profile.studentPhone || profile.email || '')}` +
-                      `&email=${encodeURIComponent(profile.email || '')}` +
-                      `&id=${encodeURIComponent(profile.studentId || '000000')}` +
-                      `&ip=${encodeURIComponent(ipAddress)}`;
-
+      // Set direct real PDF URL for downloads and mobile viewer
       setStampingState({
         status: 'ready',
-        url: viewUrl,
+        url: url,
         filename: `${filename}.pdf`
       });
     } catch (err: any) {
@@ -620,19 +613,32 @@ export const StudentLibrary: React.FC = () => {
         <div className="fixed inset-0 bg-[#0f172a] z-[100] flex flex-col" dir="rtl">
           <div className="bg-space-900 border-b border-white/10 px-6 py-4 flex items-center justify-between">
             <h3 className="text-base font-black text-white line-clamp-1">{readerFilename}</h3>
-            <button
-              onClick={() => {
-                setShowReader(false);
-                setReaderUrl('');
-              }}
-              className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 px-5 py-2.5 rounded-xl text-sm font-black transition-all"
-            >
-              إغلاق القارئ
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => triggerDirectMobileDownload(readerUrl, readerFilename)}
+                className="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white border border-emerald-500/20 px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Download size={14} />
+                <span>تحميل PDF</span>
+              </button>
+              <button
+                onClick={() => {
+                  setShowReader(false);
+                  setReaderUrl('');
+                }}
+                className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer"
+              >
+                إغلاق القارئ
+              </button>
+            </div>
           </div>
           <div className="flex-1 w-full bg-[#1e293b] relative">
             <iframe
-              src={readerUrl}
+              src={
+                readerUrl.startsWith('http')
+                  ? `https://docs.google.com/gview?url=${encodeURIComponent(readerUrl)}&embedded=true`
+                  : readerUrl
+              }
               className="w-full h-full border-0"
               title="PDF Reader"
             />
