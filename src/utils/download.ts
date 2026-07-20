@@ -83,12 +83,43 @@ export const isMobileDevice = (): boolean => {
   );
 };
 
+// Universal Mobile & Desktop Download Trigger
+export const triggerDirectMobileDownload = (url: string, filename?: string) => {
+  let targetUrl = url;
+
+  // Handle Google Drive Links (convert view link to direct download link)
+  if (url.includes('drive.google.com')) {
+    const fileId = getGoogleDriveFileId(url);
+    if (fileId) {
+      targetUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+    }
+  } else if (url.includes('dropbox.com')) {
+    targetUrl = url.replace('dl=0', 'dl=1');
+  }
+
+  const link = document.createElement('a');
+  link.href = targetUrl;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  if (filename) {
+    link.download = filename;
+  }
+  
+  document.body.appendChild(link);
+  link.click();
+  setTimeout(() => {
+    if (document.body.contains(link)) {
+      document.body.removeChild(link);
+    }
+  }, 1000);
+};
+
 // Download file with progress tracking
 export const downloadFile = async (url: string, options: DownloadOptions = {}): Promise<void> => {
   const { filename, onProgress, onComplete, onError, signal } = options;
 
   if (isMobileDevice()) {
-    window.open(url, '_blank');
+    triggerDirectMobileDownload(url, filename);
     if (onComplete) {
       onComplete(new Blob());
     }
@@ -180,6 +211,8 @@ export const downloadFile = async (url: string, options: DownloadOptions = {}): 
       console.log('Download cancelled');
       return;
     }
+    // Fallback to direct anchor link on mobile/browsers
+    triggerDirectMobileDownload(url, filename);
     if (onError) {
       onError(error instanceof Error ? error : new Error(String(error)));
     }
@@ -201,52 +234,31 @@ export const downloadViaProxy = async (
   filename?: string,
   onProgress?: (progress: DownloadProgress) => void
 ): Promise<void> => {
+  let targetUrl = fileUrl;
+
+  // Handle Google Drive Links
+  if (fileUrl.includes('drive.google.com')) {
+    const fileId = getGoogleDriveFileId(fileUrl);
+    if (fileId) {
+      targetUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+    }
+  } else if (fileUrl.includes('dropbox.com')) {
+    targetUrl = fileUrl.replace('dl=0', 'dl=1');
+  }
+
   if (isMobileDevice()) {
-    window.open(fileUrl, '_blank');
+    triggerDirectMobileDownload(targetUrl, filename);
     return;
   }
 
   try {
-    // Handle Google Drive Links
-    if (fileUrl.includes('drive.google.com')) {
-      const fileId = getGoogleDriveFileId(fileUrl);
-      if (fileId) {
-        const directUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-        const link = document.createElement('a');
-        link.href = directUrl;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        return;
-      }
-    }
-
-    // Handle Dropbox Links
-    if (fileUrl.includes('dropbox.com')) {
-      const directUrl = fileUrl.replace('dl=0', 'dl=1');
-      const link = document.createElement('a');
-      link.href = directUrl;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      return;
-    }
-
-    // Try downloading directly via blob
-    await downloadFile(fileUrl, {
+    await downloadFile(targetUrl, {
       filename,
       onProgress,
     });
   } catch (error) {
-    console.error('Direct download failed (possibly CORS), falling back to new tab:', error);
-    // Fallback: open in new tab
-    const link = document.createElement('a');
-    link.href = fileUrl;
-    link.target = '_blank';
-    link.download = filename || 'download';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    console.error('Direct download failed, falling back to direct link:', error);
+    triggerDirectMobileDownload(targetUrl, filename);
   }
 };
 

@@ -58,7 +58,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { useTenant } from '../contexts/TenantContext';
 import { Quiz } from '../components/Quiz';
 import { CourseDiscussions } from '../components/CourseDiscussions';
-import { isMobileDevice } from '../utils/download';
+import { isMobileDevice, triggerDirectMobileDownload } from '../utils/download';
 import { LessonSkeleton } from '../components/Skeleton';
 import { FahmniPlayer } from '../components/FahmniPlayer';
 import { CertificateGenerator } from '../components/CertificateGenerator';
@@ -229,9 +229,7 @@ export const LessonView: React.FC = () => {
   const [stampingState, setStampingState] = useState<{
     status: 'idle' | 'preparing' | 'ready' | 'error';
     url?: string;
-    dataUrl?: string;
     filename?: string;
-    blob?: Blob;
     error?: string;
   } | null>(null);
   const [showReader, setShowReader] = useState(false);
@@ -276,76 +274,26 @@ export const LessonView: React.FC = () => {
         console.warn('Could not fetch public IP for watermark', e);
       }
 
-      let fetchUrl = url;
-      if (url.includes('drive.google.com')) {
-        const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-        if (match && match[1]) {
-          fetchUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`;
-        }
-      }
-
-      let response;
-      try {
-        response = await fetch(fetchUrl);
-      } catch (corsErr) {
-        console.warn('Direct fetch failed:', corsErr);
-      }
-
-      if (!response || !response.ok) {
-        setStampingState({
-          status: 'ready',
-          url: url,
-          dataUrl: url,
-          filename: `${filename}.pdf`
-        });
-        return;
-      }
-
-      const arrayBuffer = await response.arrayBuffer();
-      const { isValidPdfBuffer, stampPDFWithForensics } = await import('../utils/pdfForensic');
-
-      if (!isValidPdfBuffer(arrayBuffer)) {
-        console.warn('Fetched file is not a valid PDF, opening directly.');
-        setStampingState({
-          status: 'ready',
-          url: url,
-          dataUrl: url,
-          filename: `${filename}.pdf`
-        });
-        return;
-      }
-
-      const stampedBytes = await stampPDFWithForensics(arrayBuffer, {
-        studentName: profile.displayName || 'طالب',
-        studentPhone: profile.studentPhone || profile.email || '',
-        studentEmail: profile.email || '',
-        studentId: profile.studentId || '000000',
-        ipAddress,
-      });
-
-      const blob = new Blob([stampedBytes], { type: 'application/pdf' });
-      const blobUrl = URL.createObjectURL(blob);
-
-      const reader = new FileReader();
-      const dataUrl = await new Promise<string>((resolve) => {
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(blob);
-      });
+      // Generate the server-side PDF watermarking URL
+      const viewUrl = `/api/view-pdf?url=${encodeURIComponent(url)}` +
+                      `&name=${encodeURIComponent(profile.displayName || '')}` +
+                      `&phone=${encodeURIComponent(profile.studentPhone || profile.email || '')}` +
+                      `&email=${encodeURIComponent(profile.email || '')}` +
+                      `&id=${encodeURIComponent(profile.studentId || '000000')}` +
+                      `&ip=${encodeURIComponent(ipAddress)}`;
 
       setStampingState({
         status: 'ready',
-        url: blobUrl,
-        dataUrl: dataUrl,
-        filename: `${filename}.pdf`,
-        blob: blob
+        url: viewUrl,
+        filename: `${filename}.pdf`
       });
     } catch (err: any) {
       console.error('Forensic preparation failed:', err);
       setStampingState({
-        status: 'ready',
+        status: 'error',
         url: url,
-        dataUrl: url,
-        filename: `${filename}.pdf`
+        filename: `${filename}.pdf`,
+        error: err.message || String(err)
       });
     } finally {
       setDownloadingBooklet(false);
@@ -1946,17 +1894,11 @@ export const LessonView: React.FC = () => {
 
                 <div className="grid grid-cols-1 gap-2.5 max-h-[300px] overflow-y-auto pr-1">
                   {/* Option 📲 Share API (Mobile native share sheet) */}
-                  {stampingState.filename && typeof navigator !== 'undefined' && navigator.share && (
+                  {stampingState.url && stampingState.filename && typeof navigator !== 'undefined' && navigator.share && (
                     <button
                       onClick={async () => {
                         try {
-                          if (stampingState.blob && stampingState.filename) {
-                            const file = new File([stampingState.blob], stampingState.filename, { type: 'application/pdf' });
-                            await navigator.share({
-                              files: [file],
-                              title: stampingState.filename,
-                            });
-                          } else if (stampingState.url && stampingState.filename) {
+                          if (stampingState.url && stampingState.filename) {
                             const response = await fetch(stampingState.url);
                             const blob = await response.blob();
                             const file = new File([blob], stampingState.filename, { type: 'application/pdf' });
@@ -1978,9 +1920,8 @@ export const LessonView: React.FC = () => {
                   {/* Option 📖 Inline PDF Reader */}
                   <button
                     onClick={() => {
-                      const targetUrl = stampingState.dataUrl || stampingState.url;
-                      if (targetUrl && stampingState.filename) {
-                        setReaderUrl(targetUrl);
+                      if (stampingState.url && stampingState.filename) {
+                        setReaderUrl(stampingState.url);
                         setReaderFilename(stampingState.filename);
                         setShowReader(true);
                         setStampingState(null); // close modal
@@ -1991,33 +1932,28 @@ export const LessonView: React.FC = () => {
                     <span>📖 عرض وقراءة داخل الموقع (آمن 100%)</span>
                   </button>
 
-                  {/* Option 🌐 Open in New Tab */}
+                  {/* Option 🌐 Open / Download for Mobile & PC */}
                   <button
                     onClick={() => {
                       if (stampingState.url) {
-                        window.open(stampingState.url, '_blank');
+                        triggerDirectMobileDownload(stampingState.url, stampingState.filename);
                       }
                     }}
                     className="w-full bg-white/10 hover:bg-white/15 text-white font-black py-3 rounded-2xl flex items-center justify-center gap-2 transition-all text-xs"
                   >
-                    <span>🌐 فتح وعرض في تبويب جديد</span>
+                    <span>🌐 فتح وتنزيل المذكرة (للهواتف والكمبيوتر)</span>
                   </button>
 
-                  {/* Option 💻 Simulated click (Desktop fallback) */}
+                  {/* Option 💻 Direct Download */}
                   <button
                     onClick={() => {
-                      if (stampingState.url && stampingState.filename) {
-                        const link = document.createElement('a');
-                        link.href = stampingState.url;
-                        link.download = stampingState.filename;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
+                      if (stampingState.url) {
+                        triggerDirectMobileDownload(stampingState.url, stampingState.filename);
                       }
                     }}
                     className="w-full bg-white/5 hover:bg-white/10 text-gray-300 font-bold py-2.5 rounded-2xl flex items-center justify-center gap-2 transition-all text-xs border border-white/5"
                   >
-                    <span>💻 تحميل مباشر للكمبيوتر</span>
+                    <span>💻 تحميل مباشر للذاكرة</span>
                   </button>
                 </div>
 
