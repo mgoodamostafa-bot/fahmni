@@ -1,6 +1,12 @@
 import { initializeApp, getApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
-import { initializeFirestore, getFirestore, Firestore } from 'firebase/firestore';
+import {
+  initializeFirestore,
+  getFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  Firestore
+} from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import jsonConfig from '../../firebase-applet-config.json';
 
@@ -43,11 +49,14 @@ if (!getApps().length) {
   masterApp = getApp();
 }
 
-// Safe Firestore initialization helper with long polling fallback
+// Safe Firestore initialization helper with long polling fallback and persistent local cache
 const getOrInitializeFirestore = (appInstance: FirebaseApp, databaseId: string): Firestore => {
   try {
     return initializeFirestore(appInstance, {
       experimentalForceLongPolling: true,
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
     }, databaseId);
   } catch (error) {
     console.warn(`Firestore already initialized for app "${appInstance.name}", using getFirestore.`);
