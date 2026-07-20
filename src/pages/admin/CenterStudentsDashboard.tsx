@@ -735,7 +735,12 @@ export const CenterStudentsDashboard: React.FC = () => {
           )}
 
           {activeTab === 'offline-results' && (
-            <OfflineResults key="offline-results" />
+            <OfflineResults
+              key="offline-results"
+              centers={centers}
+              groups={groups}
+              allCenterStudents={allCenterStudents}
+            />
           )}
 
           {activeTab === 'financials' && (
