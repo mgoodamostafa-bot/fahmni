@@ -15,6 +15,7 @@ import {
   Database,
   Building2,
   LogOut,
+  MessageSquare,
 } from 'lucide-react';
 import { SocialLinks } from './SocialLinks';
 import { useSettings } from '../contexts/SettingsContext';
@@ -133,6 +134,12 @@ export const AdminSidebar = ({
     },
 
     // Communication & Settings
+    {
+      to: '/admin/messages',
+      icon: <MessageSquare size={20} />,
+      label: 'رسائل الطلاب وأولياء الأمور',
+      category: 'التواصل',
+    },
     {
       to: '/admin/send-notification',
       icon: <Send size={20} />,

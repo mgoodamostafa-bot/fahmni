@@ -47,6 +47,8 @@ interface Tenant {
   subdomain: string;
   package: string;
   firebaseConfig: string;
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
   loyaltySystem: boolean;
   customSubdomain: boolean;
   slogan?: string;
@@ -1095,6 +1097,40 @@ export const SuperAdminDashboard = () => {
                       <p className="text-[10px] text-gray-500 text-center">
                         يجب أن تكون بتنسيق JSON صحيح
                       </p>
+                    </div>
+
+                    {/* Supabase Database Settings */}
+                    <div className="bg-emerald-500/5 border border-emerald-500/20 p-4 rounded-2xl space-y-3">
+                      <h4 className="text-xs font-black text-emerald-400 flex items-center gap-2">
+                        <span>⚡ إعدادات قاعدة البيانات الفورية (Supabase Database Settings)</span>
+                      </h4>
+                      <div className="space-y-3">
+                        <div className="space-y-1">
+                          <label className="text-[11px] text-gray-300 font-bold">Supabase URL (رابط المشروع)</label>
+                          <input
+                            type="text"
+                            value={editingTenant.supabaseUrl || ''}
+                            onChange={(e) =>
+                              setEditingTenant({ ...editingTenant, supabaseUrl: e.target.value })
+                            }
+                            placeholder="https://your-project.supabase.co"
+                            className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-white font-mono text-xs focus:border-emerald-500 focus:outline-none"
+                            dir="ltr"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[11px] text-gray-300 font-bold">Supabase Anon Key (المفتاح العام)</label>
+                          <textarea
+                            value={editingTenant.supabaseAnonKey || ''}
+                            onChange={(e) =>
+                              setEditingTenant({ ...editingTenant, supabaseAnonKey: e.target.value })
+                            }
+                            placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                            className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2 text-white font-mono text-xs h-16 focus:border-emerald-500 focus:outline-none resize-none"
+                            dir="ltr"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}

@@ -110,6 +110,9 @@ const PaymentSettings = lazy(() =>
 const SendNotification = lazy(() =>
   import('./pages/admin/SendNotification').then((m) => ({ default: m.SendNotification }))
 );
+const MessagingPage = lazy(() =>
+  import('./pages/teacher/MessagingPage').then((m) => ({ default: m.MessagingPage }))
+);
 const Maintenance = lazy(() =>
   import('./pages/admin/Maintenance').then((m) => ({ default: m.Maintenance }))
 );
@@ -638,6 +641,7 @@ function AppRouter() {
               <Route path="submissions" element={<HomeworkSubmissions />} />
               <Route path="notifications" element={<Notifications />} />
               <Route path="send-notification" element={<SendNotification />} />
+              <Route path="messages" element={<MessagingPage />} />
 
               {/* ── Admin pages merged into teacher ── */}
               <Route path="users" element={<ManageUsers />} />

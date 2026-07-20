@@ -14,6 +14,7 @@ import {
   BookOpen,
   Check,
   Video,
+  Database,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { FRUIT_LIST, applyFruitTheme } from '../../constants/fruitThemes';
@@ -398,6 +399,8 @@ export const SiteSettings: React.FC = () => {
                 heroTitle2: finalSettings.heroTitle2 || '',
                 heroTitle3: finalSettings.heroTitle3 || '',
                 heroDescription: finalSettings.heroDescription || '',
+                supabaseUrl: finalSettings.supabaseUrl || '',
+                supabaseAnonKey: finalSettings.supabaseAnonKey || '',
               },
               { merge: true }
             )
@@ -508,6 +511,42 @@ export const SiteSettings: React.FC = () => {
                 className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:outline-none focus:border-brand-blue transition-colors min-h-[100px]"
                 placeholder="أدخل وصف الموقع لمحركات البحث..."
               />
+            </div>
+
+            {/* Supabase Database Config */}
+            <div className="pt-6 border-t border-white/10 space-y-4">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <Database size={20} className="text-emerald-400" />
+                <span>إعدادات قاعدة بيانات السوبابيس الفورية (Supabase Database Settings)</span>
+              </h3>
+              <p className="text-xs text-gray-400 font-bold">
+                ربط ومعلومات السيرفر لقاعدة بيانات السناتر والنتائج الفورية
+              </p>
+
+              <div className="bg-emerald-500/5 border border-emerald-500/20 p-5 rounded-2xl space-y-4">
+                <div>
+                  <label className="block text-gray-300 font-bold mb-1.5 text-xs">Supabase URL (رابط المشروع)</label>
+                  <input
+                    type="text"
+                    value={settings.supabaseUrl || ''}
+                    onChange={(e) => setSettings({ ...settings, supabaseUrl: e.target.value })}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
+                    placeholder="https://your-project.supabase.co"
+                    dir="ltr"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 font-bold mb-1.5 text-xs">Supabase Anon Key (المفتاح العام)</label>
+                  <textarea
+                    value={settings.supabaseAnonKey || ''}
+                    onChange={(e) => setSettings({ ...settings, supabaseAnonKey: e.target.value })}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white font-mono text-xs focus:outline-none focus:border-emerald-500 min-h-[70px]"
+                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    dir="ltr"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="pt-6 border-t border-white/10">

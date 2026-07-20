@@ -155,6 +155,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { type: 'header', label: 'الإعدادات العامة', role: 'admin' },
     { to: '/teacher/diagnostic', icon: <Settings size={22} />, label: 'إعدادات المنصة', role: 'admin' },
 
+    {
+      to: '/teacher/messages',
+      icon: <MessageSquare size={22} />,
+      label: 'رسائل الطلاب وأولياء الأمور',
+      role: 'admin',
+    },
     // --- Common ---
     {
       to: '/notifications',

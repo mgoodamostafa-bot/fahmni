@@ -70,6 +70,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({ isOpen, onClose 
 
   // ── Communication items ──
   const commItems = [
+    { icon: <MessageSquare size={22} />, label: 'رسائل الطلاب وأولياء الأمور', path: '/teacher/messages' },
     { icon: <Bell size={22} />, label: 'التنبيهات', path: '/teacher/notifications' },
     { icon: <Send size={22} />, label: 'إرسال تنبيه', path: '/teacher/send-notification' },
   ];

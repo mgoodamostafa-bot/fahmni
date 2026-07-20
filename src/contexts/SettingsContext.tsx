@@ -50,6 +50,8 @@ export interface SiteSettings {
   heroTitle2?: string;
   heroTitle3?: string;
   heroDescription?: string;
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
 }
 
 interface SettingsContextType {
