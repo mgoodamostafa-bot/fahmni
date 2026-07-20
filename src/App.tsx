@@ -40,6 +40,7 @@ const GradeSelection = lazy(() =>
 );
 const Login = lazy(() => import('./pages/Login').then((m) => ({ default: m.Login })));
 const ParentPortal = lazy(() => import('./pages/ParentPortal').then((m) => ({ default: m.ParentPortal })));
+const ParentCenterPortal = lazy(() => import('./pages/ParentCenterPortal').then((m) => ({ default: m.ParentCenterPortal })));
 const Register = lazy(() => import('./pages/Register').then((m) => ({ default: m.Register })));
 const CourseCatalog = lazy(() =>
   import('./pages/CourseCatalog').then((m) => ({ default: m.CourseCatalog }))
@@ -114,6 +115,9 @@ const Maintenance = lazy(() =>
 );
 const CenterBranches = lazy(() =>
   import('./pages/admin/CenterBranches').then((m) => ({ default: m.CenterBranches }))
+);
+const CenterStudentsDashboard = lazy(() =>
+  import('./pages/admin/CenterStudentsDashboard').then((m) => ({ default: m.CenterStudentsDashboard }))
 );
 const GroupManagement = lazy(() =>
   import('./pages/admin/GroupManagement').then((m) => ({ default: m.GroupManagement }))
@@ -481,6 +485,9 @@ function AppRouter() {
               }
             />
             <Route path="parent" element={<ParentPortal />} />
+            <Route path="parent-center" element={<ParentCenterPortal />} />
+            <Route path="center-parent" element={<ParentCenterPortal />} />
+            <Route path="parent/center" element={<ParentCenterPortal />} />
             <Route
               path="question-bank"
               element={
@@ -642,6 +649,8 @@ function AppRouter() {
               <Route path="enrollments" element={<ManageEnrollments />} />
               <Route path="codes" element={<CardCodeManager />} />
               <Route path="maintenance" element={<Maintenance />} />
+              <Route path="center" element={<CenterStudentsDashboard />} />
+              <Route path="center-dashboard" element={<CenterStudentsDashboard />} />
               <Route path="branches" element={<CenterBranches />} />
               <Route path="groups" element={<GroupManagement />} />
               <Route path="offline-results" element={<OfflineResults />} />

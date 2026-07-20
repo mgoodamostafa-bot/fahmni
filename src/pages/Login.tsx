@@ -397,13 +397,17 @@ export const Login: React.FC = () => {
                   </Link>
                 </p>
 
-                <div className="pt-4 border-t border-white/5 text-center">
-                  <p className="text-xs font-bold text-slate-500">
-                    هل أنت ولي أمر؟{' '}
-                    <Link to="/parent" className="text-brand-blue hover:underline font-black transition-colors">
-                      تابع مستوى وتحصيل ابنك من هنا
+                <div className="pt-4 border-t border-white/5 text-center space-y-2">
+                  <p className="text-xs font-bold text-slate-400">تابع مستوى وتحصيل ابنك من هنا:</p>
+                  <div className="flex items-center justify-center gap-3 text-xs font-black">
+                    <Link to="/parent-center" className="text-emerald-400 hover:text-emerald-300 hover:underline flex items-center gap-1 transition-colors">
+                      <span>🏫 بوابة ولي أمر السنتر</span>
                     </Link>
-                  </p>
+                    <span className="text-slate-600">|</span>
+                    <Link to="/parent" className="text-brand-blue hover:text-blue-400 hover:underline flex items-center gap-1 transition-colors">
+                      <span>🌐 بوابة ولي أمر المنصة</span>
+                    </Link>
+                  </div>
                 </div>
               </div>
 

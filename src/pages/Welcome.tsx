@@ -353,13 +353,22 @@ export const Welcome: React.FC = () => {
                   لوحة إحصائيات وتقارير تفاعلية تمكن أولياء الأمور من متابعة درجات الامتحانات والواجبات والمحفظة أولاً بأول.
                 </p>
               </div>
-              <Link
-                to="/parent"
-                className="inline-flex items-center gap-2 text-xs font-black text-brand-500 hover:text-brand-400 hover:underline pt-2 cursor-pointer"
-              >
-                <span>دخول بوابة المتابعة</span>
-                <span>←</span>
-              </Link>
+              <div className="flex flex-col sm:flex-row gap-3 pt-2 text-xs font-black">
+                <Link
+                  to="/parent-center"
+                  className="inline-flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 hover:underline cursor-pointer"
+                >
+                  <span>🏫 بوابة ولي أمر السنتر</span>
+                  <span>←</span>
+                </Link>
+                <Link
+                  to="/parent"
+                  className="inline-flex items-center gap-1.5 text-brand-500 hover:text-brand-400 hover:underline cursor-pointer"
+                >
+                  <span>🌐 بوابة ولي أمر المنصة</span>
+                  <span>←</span>
+                </Link>
+              </div>
             </div>
 
             <div className="bg-[#13131c]/60 border border-white/5 p-6 rounded-[2rem] space-y-4 hover:border-brand-500/25 transition-all">

@@ -13,6 +13,7 @@ import {
   X,
   Send,
   Database,
+  Building2,
   LogOut,
 } from 'lucide-react';
 import { SocialLinks } from './SocialLinks';
@@ -88,6 +89,12 @@ export const AdminSidebar = ({
     },
 
     // Center & Finance Category
+    {
+      to: '/teacher/center',
+      icon: <Building2 size={20} />,
+      label: 'نظام إدارة السناتر (Center OS)',
+      category: 'السنتر والماليات',
+    },
     {
       to: '/admin/finance',
       icon: <CreditCard size={20} />,

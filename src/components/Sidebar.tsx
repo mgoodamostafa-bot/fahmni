@@ -27,6 +27,7 @@ import {
   Trophy,
   MessageSquare,
   Star,
+  Building2,
 } from 'lucide-react';
 import { getTenantAuth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
@@ -124,6 +125,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     // Center OS Section
     { type: 'header', label: 'إدارة السنتر (Center OS)', role: 'admin' },
+    {
+      to: '/teacher/center',
+      icon: <Building2 size={22} />,
+      label: 'لوحة إدارة السناتر الشاملة',
+      role: 'admin',
+    },
     {
       to: '/teacher/attendance',
       icon: <QrCode size={22} />,

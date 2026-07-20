@@ -158,6 +158,7 @@ export const TeacherSidebar: React.FC<TeacherSidebarProps> = ({ isOpen, onClose 
     ];
 
     const studentManagementItems = [
+      { icon: <Building2 size={22} />, label: 'نظام إدارة السناتر (Center OS)', path: '/teacher/center' },
       { icon: <Users size={22} />, label: 'الطلاب المشتركين بالدورات', path: '/teacher/students' },
       { icon: <UsersRound size={22} />, label: 'أسماء وبيانات الطلاب المسجلين', path: '/teacher/users' },
       { icon: <Building2 size={22} />, label: 'إدارة المجموعات', path: '/teacher/groups' },
