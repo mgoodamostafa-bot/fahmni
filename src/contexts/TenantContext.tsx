@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { initTenantApp, masterDb } from '../lib/firebase';
+import { initTenantSupabase } from '../lib/supabase';
 import { doc, getDoc } from 'firebase/firestore';
 import { applyFruitTheme } from '../constants/fruitThemes';
 import type { FruitId } from '../constants/fruitThemes';
@@ -181,6 +182,7 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setTenantData(cleanData);
       applyTenantBranding(cleanData);
       initFirebaseFromTenantData(cleanData);
+      initTenantSupabase(cleanData);
       setIsLoading(false);
       clearTimeout(globalFailsafe);
       // Continue to fetch fresh data in background (silent refresh)
@@ -208,6 +210,7 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           setTenantData(data);
           applyTenantBranding(data);
           initFirebaseFromTenantData(data);
+          initTenantSupabase(data);
           // Cache for next visit
           setCachedTenant(extractedTenant!, data);
         } else {

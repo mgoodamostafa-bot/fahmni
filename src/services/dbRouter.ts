@@ -142,17 +142,46 @@ export const dbRouter = {
     return await centerStudentService.createStudent(studentData);
   },
 
-  // 2. Get all students
+  // 2. Get all students (merges Supabase and Firestore records to guarantee 100% full list)
   async getAllStudents(): Promise<CenterStudent[]> {
+    let supabaseStudents: CenterStudent[] = [];
     if (isSupabaseConfigured() && supabase) {
-      console.log('⚡ [DB ROUTER] Fetching all students from Supabase...');
-      const { data, error } = await supabase.from('center_students').select('*');
-      if (!error && data) {
-        const students = data.map(mapSqlToStudent);
-        return await mergeFirestoreDataForStudents(students);
+      try {
+        console.log('⚡ [DB ROUTER] Fetching all students from Supabase...');
+        const { data, error } = await supabase.from('center_students').select('*');
+        if (!error && data) {
+          supabaseStudents = data.map(mapSqlToStudent);
+        }
+      } catch (err) {
+        console.warn('⚡ [DB ROUTER] Supabase fetch error:', err);
       }
     }
-    return await centerStudentService.getAllStudents();
+
+    const firestoreStudents = await centerStudentService.getAllStudents();
+
+    if (supabaseStudents.length === 0) {
+      return firestoreStudents;
+    }
+
+    const map = new Map<string, CenterStudent>();
+    
+    // Add Firestore students first
+    firestoreStudents.forEach((s) => {
+      const key = (s.uid || s.studentId || s.displayName).trim();
+      map.set(key, s);
+    });
+
+    // Merge Supabase students
+    supabaseStudents.forEach((s) => {
+      const key = (s.uid || s.studentId || s.displayName).trim();
+      if (!map.has(key)) {
+        map.set(key, s);
+      } else {
+        map.set(key, { ...map.get(key), ...s });
+      }
+    });
+
+    return Array.from(map.values());
   },
 
   // 3. Get student by Uid
