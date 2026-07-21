@@ -162,34 +162,48 @@ export const AttendanceScanner: React.FC = () => {
     }
   };
 
-  const handleRecordAttendance = (identifier: string) => {
-    const cleanId = identifier.trim();
-    if (!cleanId) return;
+  const handleRecordAttendance = async (identifier: string) => {
+    const rawId = identifier.trim();
+    if (!rawId) return;
 
     // Debounce duplicate scans within 2.5 seconds
     const now = Date.now();
     if (
-      lastScannedTimeRef.current.code === cleanId &&
+      lastScannedTimeRef.current.code === rawId &&
       now - lastScannedTimeRef.current.time < 2500
     ) {
       return;
     }
-    lastScannedTimeRef.current = { code: cleanId, time: now };
+    lastScannedTimeRef.current = { code: rawId, time: now };
+
+    const cleanPhone = rawId.replace(/\D/g, '');
 
     // ⚡ INSTANT 0ms LOOKUP from memory
-    let matched = allStudentsMap.get(cleanId);
+    let matched =
+      allStudentsMap.get(rawId) ||
+      (cleanPhone ? allStudentsMap.get(cleanPhone) : null);
 
+    // Fallback dynamic lookup if not matched in pre-indexed map
     if (!matched) {
-      // Fallback search in map keys
-      const cleanPhone = cleanId.replace(/\D/g, '');
-      if (cleanPhone && allStudentsMap.has(cleanPhone)) {
-        matched = allStudentsMap.get(cleanPhone);
+      try {
+        const freshStudents = await dbRouter.getAllStudents();
+        buildStudentsIndex(freshStudents);
+        matched = freshStudents.find(
+          (s: any) =>
+            (s.studentId && String(s.studentId).trim() === rawId) ||
+            (s.studentId && String(s.studentId).trim().replace(/^0+/, '') === rawId.replace(/^0+/, '')) ||
+            (s.uid && String(s.uid).trim() === rawId) ||
+            (s.id && String(s.id).trim() === rawId) ||
+            (s.studentPhone && s.studentPhone.replace(/\D/g, '') === cleanPhone)
+        );
+      } catch (e) {
+        console.warn('Error doing fallback student lookup:', e);
       }
     }
 
     if (!matched) {
       playChime(300, 'sawtooth');
-      setStatus({ type: 'error', message: `لم يتم العثور على طالب بالكود: (${cleanId})` });
+      setStatus({ type: 'error', message: `لم يتم العثور على طالب بالكود: (${rawId})` });
       setScannedStudent(null);
       return;
     }
@@ -197,7 +211,7 @@ export const AttendanceScanner: React.FC = () => {
     const studentData: ScannedStudent = {
       uid: matched.uid || matched.id,
       displayName: matched.displayName || matched.name || 'طالب سنتر',
-      studentId: matched.studentId || matched.code || cleanId,
+      studentId: matched.studentId || matched.code || rawId,
       photoURL: matched.photoURL || matched.avatar,
       level: matched.level || matched.grade || 'الصف الأول الثانوي',
       grade: matched.grade || matched.level || 'الصف الأول الثانوي',

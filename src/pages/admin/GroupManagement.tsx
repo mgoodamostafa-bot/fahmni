@@ -61,6 +61,8 @@ export const GroupManagement: React.FC = () => {
     capacity: 30,
   });
 
+  const [students, setStudents] = useState<any[]>([]);
+
   useEffect(() => {
     // 1. Fetch Centers
     const unsubCenters = onSnapshot(collection(db, 'centers'), (snap) => {
@@ -77,6 +79,13 @@ export const GroupManagement: React.FC = () => {
     const unsubGroups = onSnapshot(collection(db, 'groups'), (snap) => {
       setGroups(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Group));
       setLoading(false);
+    });
+
+    // 4. Fetch All Students dynamically for group counts
+    import('../../services/dbRouter').then(({ dbRouter }) => {
+      dbRouter.getAllStudents().then((allStus) => {
+        setStudents(allStus);
+      });
     });
 
     return () => {
@@ -357,20 +366,35 @@ export const GroupManagement: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="mt-8 pt-4 border-t border-white/5 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Users size={14} className="text-slate-500" />
-                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">
-                      اكتمال العدد
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-white">0 / {group.capacity}</span>
-                    <div className="w-16 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                      <div className="bg-brand-yellow h-full" style={{ width: '0%' }} />
+                {(() => {
+                  const count = students.filter(
+                    (s) => s.groupId === group.id || s.group_id === group.id
+                  ).length;
+                  const capacity = group.capacity || 30;
+                  const percent = Math.min(100, Math.round((count / capacity) * 100));
+
+                  return (
+                    <div className="mt-8 pt-4 border-t border-white/5 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Users size={14} className="text-amber-400" />
+                        <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
+                          عدد الطلاب الحالي
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-amber-400">
+                          {count} / {capacity}
+                        </span>
+                        <div className="w-16 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                          <div
+                            className="bg-gradient-to-r from-amber-500 to-amber-300 h-full transition-all duration-500"
+                            style={{ width: `${percent}%` }}
+                          />
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
             ))}
           </div>
