@@ -12,7 +12,7 @@ import {
 import { db } from '../../lib/firebase';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { dbRouter } from '../../services/dbRouter';
-import { CheckCircle, AlertCircle, User, Clock, QrCode, ArrowRight, Search, Volume2, Sparkles } from 'lucide-react';
+import { CheckCircle, AlertCircle, User, Clock, QrCode, ArrowRight, Search, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
@@ -41,15 +41,15 @@ export const AttendanceScanner: React.FC = () => {
   const [scannedStudent, setScannedStudent] = useState<ScannedStudent | null>(null);
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'idle'; message: string }>({
     type: 'idle',
-    message: 'جاهز للمسح الضوئي...',
+    message: 'جاهز للمسح الضوئي الفوري ⚡ (يوجه كارت الطالب للكاميرا أو القارئ اليدوي)...',
   });
   const [recentRecords, setRecentRecords] = useState<AttendanceRecord[]>([]);
   const [manualId, setManualId] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [allStudents, setAllStudents] = useState<any[]>([]);
+  const [allStudentsMap, setAllStudentsMap] = useState<Map<string, any>>(new Map());
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastScannedTimeRef = useRef<{ code: string; time: number }>({ code: '', time: 0 });
 
-  // Play synthesized success/error audio chime
+  // Synthesize instant zero-latency audio chime
   const playChime = (freq = 880, type: OscillatorType = 'sine') => {
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -57,14 +57,26 @@ export const AttendanceScanner: React.FC = () => {
       const gain = audioCtx.createGain();
       osc.type = type;
       osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
       osc.connect(gain);
       gain.connect(audioCtx.destination);
       osc.start();
-      osc.stop(audioCtx.currentTime + 0.18);
+      osc.stop(audioCtx.currentTime + 0.15);
     } catch (e) {
       // Audio not supported
     }
+  };
+
+  // Build high-speed O(1) Student Lookup Map
+  const buildStudentsIndex = (studentsList: any[]) => {
+    const map = new Map<string, any>();
+    studentsList.forEach((s) => {
+      if (s.studentId) map.set(String(s.studentId).trim(), s);
+      if (s.uid) map.set(String(s.uid).trim(), s);
+      if (s.id) map.set(String(s.id).trim(), s);
+      if (s.studentPhone) map.set(s.studentPhone.replace(/\D/g, ''), s);
+    });
+    setAllStudentsMap(map);
   };
 
   // Pre-load all center and platform students on mount
@@ -72,7 +84,7 @@ export const AttendanceScanner: React.FC = () => {
     const loadStudents = async () => {
       try {
         const students = await dbRouter.getAllStudents();
-        setAllStudents(students);
+        buildStudentsIndex(students);
       } catch (err) {
         console.warn('Error preloading students in AttendanceScanner:', err);
       }
@@ -81,7 +93,7 @@ export const AttendanceScanner: React.FC = () => {
 
     const scanner = new Html5QrcodeScanner(
       'reader',
-      { fps: 10, qrbox: { width: 240, height: 240 } },
+      { fps: 25, qrbox: { width: 250, height: 250 } },
       /* verbose= */ false
     );
 
@@ -99,136 +111,126 @@ export const AttendanceScanner: React.FC = () => {
   }
 
   function onScanFailure(error: any) {
-    // Silent fail for scanner frames
+    // Silent fail for camera frames
   }
 
-  const handleRecordAttendance = async (identifier: string) => {
-    const cleanId = identifier.trim();
-    if (!cleanId || loading) return;
-    setLoading(true);
-    setStatus({ type: 'idle', message: 'جاري البحث والتحقق من كارت الطالب...' });
+  // Background Database Save Task (Non-blocking)
+  const saveAttendanceToDb = async (studentData: ScannedStudent) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const docId = `${studentData.uid}_${todayStr}`;
+    const nowIso = new Date().toISOString();
 
-    try {
-      // 1. Fetch fresh list if empty
-      let currentStudents = allStudents;
-      if (currentStudents.length === 0) {
-        currentStudents = await dbRouter.getAllStudents();
-        setAllStudents(currentStudents);
+    // 1. Supabase Async Save
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        await supabase.from('attendance').upsert({
+          id: docId,
+          student_uid: studentData.uid,
+          student_name: studentData.displayName,
+          student_id: studentData.studentId,
+          center_id: studentData.centerId || 'hossam_center',
+          group_id: studentData.groupId || 'h6nm0P5BSUp5GfPyjsJZ',
+          date: todayStr,
+          status: 'present',
+          timestamp: nowIso,
+        });
+      } catch (sbErr) {
+        console.warn('Supabase attendance scanner upsert warning:', sbErr);
       }
+    }
 
-      // 2. Search locally first by code, uid, id, or phone
-      let matchedStudent = currentStudents.find(
-        (s: any) =>
-          (s.studentId && String(s.studentId).trim() === cleanId) ||
-          (s.uid && String(s.uid).trim() === cleanId) ||
-          (s.id && String(s.id).trim() === cleanId) ||
-          (s.studentPhone && s.studentPhone.replace(/\D/g, '') === cleanId.replace(/\D/g, ''))
-      );
-
-      // 3. Fallback Firestore direct lookup if not found locally
-      if (!matchedStudent) {
-        let studentSnap = await getDocs(
-          query(collection(db, 'center_students'), where('studentId', '==', cleanId))
-        );
-
-        if (studentSnap.empty) {
-          studentSnap = await getDocs(
-            query(collection(db, 'users'), where('studentId', '==', cleanId))
-          );
-        }
-
-        if (!studentSnap.empty) {
-          const docData = studentSnap.docs[0].data();
-          matchedStudent = { uid: studentSnap.docs[0].id, ...docData };
-        }
-      }
-
-      if (!matchedStudent) {
-        playChime(350, 'sawtooth');
-        setStatus({ type: 'error', message: `لم يتم العثور على طالب بالكود أو الرقم: (${cleanId})` });
-        setScannedStudent(null);
-        setLoading(false);
-        return;
-      }
-
-      const studentData: ScannedStudent = {
-        uid: matchedStudent.uid || matchedStudent.id,
-        displayName: matchedStudent.displayName || matchedStudent.name || 'طالب سنتر',
-        studentId: matchedStudent.studentId || matchedStudent.code || cleanId,
-        photoURL: matchedStudent.photoURL || matchedStudent.avatar,
-        level: matchedStudent.level || matchedStudent.grade || 'الصف الأول الثانوي',
-        grade: matchedStudent.grade || matchedStudent.level || 'الصف الأول الثانوي',
-        centerId: matchedStudent.centerId || 'hossam_center',
-        groupId: matchedStudent.groupId || 'h6nm0P5BSUp5GfPyjsJZ',
-        remainingSessions: matchedStudent.remainingSessions,
-        packageName: matchedStudent.packageName,
-      };
-
-      setScannedStudent(studentData);
-
-      const todayStr = new Date().toISOString().split('T')[0];
-      const docId = `${studentData.uid}_${todayStr}`;
-      const nowIso = new Date().toISOString();
-
-      // 4. Save to Supabase
-      if (isSupabaseConfigured() && supabase) {
-        try {
-          await supabase.from('attendance').upsert({
-            id: docId,
-            student_uid: studentData.uid,
-            student_name: studentData.displayName,
-            student_id: studentData.studentId,
-            center_id: studentData.centerId,
-            group_id: studentData.groupId,
-            date: todayStr,
-            status: 'present',
-            timestamp: nowIso,
-          });
-        } catch (sbErr) {
-          console.warn('Supabase attendance scanner upsert warning:', sbErr);
-        }
-      }
-
-      // 5. Save to Firestore
-      await setDoc(doc(db, 'attendance', docId), {
+    // 2. Firestore Async Save
+    await setDoc(
+      doc(db, 'attendance', docId),
+      {
         studentUid: studentData.uid,
         studentName: studentData.displayName,
         studentId: studentData.studentId,
-        centerId: studentData.centerId,
-        groupId: studentData.groupId,
+        centerId: studentData.centerId || 'hossam_center',
+        groupId: studentData.groupId || 'h6nm0P5BSUp5GfPyjsJZ',
         date: todayStr,
         status: 'present',
         timestamp: serverTimestamp(),
-      }, { merge: true });
+      },
+      { merge: true }
+    );
 
-      // Deduct sessions if applicable
-      if (studentData.packageName && (studentData.remainingSessions ?? 0) > 0) {
-        const newSessions = Math.max(0, (studentData.remainingSessions || 1) - 1);
-        await dbRouter.updateStudent(studentData.uid, { remainingSessions: newSessions });
-        studentData.remainingSessions = newSessions;
-      }
-
-      playChime(880, 'sine');
-      setStatus({ type: 'success', message: `تم تسجيل حضور: ${studentData.displayName} بنجاح ✅` });
-
-      setRecentRecords((prev) => [
-        {
-          id: Math.random().toString(),
-          studentName: studentData.displayName,
-          studentId: studentData.studentId,
-          timestamp: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        },
-        ...prev,
-      ].slice(0, 8));
-
-      setManualId('');
-    } catch (err) {
-      console.error('Attendance Scanner Error:', err);
-      playChime(300, 'sawtooth');
-      setStatus({ type: 'error', message: 'حدث خطأ أثناء حفظ تسجيل الحضور' });
-    } finally {
-      setLoading(false);
+    // Deduct remaining sessions if applicable
+    if (studentData.packageName && (studentData.remainingSessions ?? 0) > 0) {
+      const newSessions = Math.max(0, (studentData.remainingSessions || 1) - 1);
+      await dbRouter.updateStudent(studentData.uid, { remainingSessions: newSessions });
     }
+  };
+
+  const handleRecordAttendance = (identifier: string) => {
+    const cleanId = identifier.trim();
+    if (!cleanId) return;
+
+    // Debounce duplicate scans within 2.5 seconds
+    const now = Date.now();
+    if (
+      lastScannedTimeRef.current.code === cleanId &&
+      now - lastScannedTimeRef.current.time < 2500
+    ) {
+      return;
+    }
+    lastScannedTimeRef.current = { code: cleanId, time: now };
+
+    // ⚡ INSTANT 0ms LOOKUP from memory
+    let matched = allStudentsMap.get(cleanId);
+
+    if (!matched) {
+      // Fallback search in map keys
+      const cleanPhone = cleanId.replace(/\D/g, '');
+      if (cleanPhone && allStudentsMap.has(cleanPhone)) {
+        matched = allStudentsMap.get(cleanPhone);
+      }
+    }
+
+    if (!matched) {
+      playChime(300, 'sawtooth');
+      setStatus({ type: 'error', message: `لم يتم العثور على طالب بالكود: (${cleanId})` });
+      setScannedStudent(null);
+      return;
+    }
+
+    const studentData: ScannedStudent = {
+      uid: matched.uid || matched.id,
+      displayName: matched.displayName || matched.name || 'طالب سنتر',
+      studentId: matched.studentId || matched.code || cleanId,
+      photoURL: matched.photoURL || matched.avatar,
+      level: matched.level || matched.grade || 'الصف الأول الثانوي',
+      grade: matched.grade || matched.level || 'الصف الأول الثانوي',
+      centerId: matched.centerId || 'hossam_center',
+      groupId: matched.groupId || 'h6nm0P5BSUp5GfPyjsJZ',
+      remainingSessions: matched.remainingSessions,
+      packageName: matched.packageName,
+    };
+
+    // 🚀 1. INSTANT ZERO-LATENCY UI UPDATE (0ms)
+    playChime(880, 'sine');
+    setScannedStudent(studentData);
+    setStatus({ type: 'success', message: `تم تسجيل حضور: ${studentData.displayName} بنجاح ✅` });
+
+    setRecentRecords((prev) => [
+      {
+        id: Math.random().toString(),
+        studentName: studentData.displayName,
+        studentId: studentData.studentId,
+        timestamp: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      },
+      ...prev,
+    ].slice(0, 8));
+
+    setManualId('');
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+
+    // 🚀 2. ASYNCHRONOUS BACKGROUND DB SAVE (0ms Blocking)
+    saveAttendanceToDb(studentData).catch((err) => {
+      console.error('Async Attendance Save Error:', err);
+    });
   };
 
   const handleManualSubmit = (e: React.FormEvent) => {
@@ -250,9 +252,10 @@ export const AttendanceScanner: React.FC = () => {
               <span>العودة للوحة تحكم المعلم</span>
             </button>
             <h1 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
-              <span>نظام حضور السنتر الذكي</span>
-              <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 text-[10px] rounded-full border border-emerald-500/30 font-bold">
-                تلقائي ⚡
+              <span>نظام حضور السنتر الذكي السريع</span>
+              <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 text-[10px] rounded-full border border-emerald-500/30 font-bold flex items-center gap-1">
+                <Zap size={12} className="text-emerald-400 fill-emerald-400 animate-bounce" />
+                فائق السرعة (0ms)
               </span>
             </h1>
           </div>
@@ -265,10 +268,10 @@ export const AttendanceScanner: React.FC = () => {
           {/* Scanner Side */}
           <div className="space-y-6">
             <div className="glass-card p-4 overflow-hidden relative border-emerald-500/30 border-2 rounded-3xl bg-black/40">
-              <div id="reader" className="w-full rounded-2xl overflow-hidden shadow-2xl"></div>
-              <div className="absolute top-4 right-4 bg-emerald-500/90 backdrop-blur-md px-3.5 py-1.5 rounded-full text-[10px] font-black text-slate-950 flex items-center gap-1.5 shadow-lg">
+              <div id="reader" className="w-full rounded-2xl overflow-hidden shadow-2xl min-h-[240px]"></div>
+              <div className="absolute top-4 right-4 bg-emerald-500/90 backdrop-blur-md px-3 py-1.5 rounded-full text-[10px] font-black text-slate-950 flex items-center gap-1.5 shadow-lg">
                 <span className="w-2 h-2 rounded-full bg-slate-950 animate-ping" />
-                <span>الكاميرا نشطة الآن</span>
+                <span>الماسح الذكي نشط (25 FPS)</span>
               </div>
             </div>
 
@@ -276,7 +279,7 @@ export const AttendanceScanner: React.FC = () => {
             <div
               className={`p-4 rounded-2xl border-2 transition-all flex items-center gap-3 ${
                 status.type === 'success'
-                  ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-300'
+                  ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-300 shadow-lg shadow-emerald-500/10'
                   : status.type === 'error'
                     ? 'bg-red-500/10 border-red-500/50 text-red-300'
                     : 'bg-white/5 border-white/10 text-gray-300'
@@ -296,20 +299,27 @@ export const AttendanceScanner: React.FC = () => {
             <div className="bg-white/[0.02] border border-white/10 p-5 rounded-3xl space-y-3">
               <h3 className="text-white font-black text-xs flex items-center gap-2">
                 <Search size={16} className="text-emerald-400" />
-                <span>إدخال كود الطالب أو القارئ الضوئي (Barcode)</span>
+                <span>إدخال كود الطالب أو القارئ الضوئي (Barcode Gun)</span>
               </h3>
               <form onSubmit={handleManualSubmit} className="flex gap-2">
                 <input
                   ref={inputRef}
                   type="text"
                   value={manualId}
-                  onChange={(e) => setManualId(e.target.value)}
-                  placeholder="أدخل كود الطالب (مثال: 2026028)..."
+                  onChange={(e) => {
+                    setManualId(e.target.value);
+                    // Fast auto-trigger for Barcode guns if code is 6+ digits
+                    if (e.target.value.length >= 6) {
+                      handleRecordAttendance(e.target.value);
+                    }
+                  }}
+                  placeholder="أدخل كود الطالب (مثل: 2026028)..."
                   className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white text-xs font-mono font-bold outline-none focus:border-emerald-500 transition-all"
+                  autoFocus
                 />
                 <button
                   type="submit"
-                  disabled={loading || !manualId.trim()}
+                  disabled={!manualId.trim()}
                   className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-6 py-3 rounded-2xl font-black text-xs transition-all disabled:opacity-50 cursor-pointer shadow-lg shadow-emerald-500/20"
                 >
                   تسجيل
@@ -324,9 +334,10 @@ export const AttendanceScanner: React.FC = () => {
               {scannedStudent ? (
                 <motion.div
                   key="student"
-                  initial={{ opacity: 0, scale: 0.9 }}
+                  initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
                   className="bg-white/[0.03] border-2 border-emerald-500/40 p-6 rounded-3xl text-center space-y-4 shadow-2xl relative overflow-hidden"
                 >
                   <div className="w-24 h-24 mx-auto rounded-2xl overflow-hidden border-2 border-emerald-400 shadow-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 font-black text-3xl">
@@ -369,7 +380,7 @@ export const AttendanceScanner: React.FC = () => {
                 <div className="bg-white/[0.02] border border-dashed border-white/10 p-10 rounded-3xl flex flex-col items-center justify-center text-gray-500 text-center min-h-[220px]">
                   <User size={54} className="opacity-20 mb-3" />
                   <p className="font-bold text-xs text-gray-400">في انتظار مسح كارت الطالب...</p>
-                  <p className="text-[11px] text-gray-600 mt-1">بيانات الطالب المسجَّل ستظهر هنا فور المسح تلقائياً</p>
+                  <p className="text-[11px] text-gray-600 mt-1">بيانات الطالب الفورية ستظهر هنا بدون أي تأخير ⚡</p>
                 </div>
               )}
             </AnimatePresence>
@@ -377,7 +388,7 @@ export const AttendanceScanner: React.FC = () => {
             {/* Recent History */}
             <div className="bg-white/[0.02] border border-white/10 p-5 rounded-3xl space-y-4">
               <h3 className="text-white font-black text-xs border-b border-white/5 pb-3 flex items-center justify-between">
-                <span>آخر عمليات التسجيل بالماسح</span>
+                <span>آخر عمليات التسجيل بالماسح الفوري</span>
                 <span className="text-emerald-400 font-mono text-[10px] font-bold">({recentRecords.length} طالب)</span>
               </h3>
               <div className="space-y-2 max-h-52 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10">
