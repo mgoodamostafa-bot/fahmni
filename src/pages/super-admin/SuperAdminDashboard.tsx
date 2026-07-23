@@ -124,12 +124,168 @@ export const SuperAdminDashboard = () => {
     estimatedSpaceMB: number;
   } | null>(null);
 
-  // Standalone release publisher states
+  // Standalone release publisher & exporter states
   const [isReleaseModalOpen, setIsReleaseModalOpen] = useState(false);
   const [releaseVersion, setReleaseVersion] = useState('v2.5.0');
   const [releaseNotes, setReleaseNotes] = useState('تحديث شامل لنظام الحضور الذكي بالـ QR، زيادة سرعة الماسح، وإصلاح إحصائيات المجموعات وربط الدومينات الخاصة.');
   const [releaseZipUrl, setReleaseZipUrl] = useState('');
   const [publishingRelease, setPublishingRelease] = useState(false);
+  const [exporterTenant, setExporterTenant] = useState<Tenant | null>(null);
+  const [tenantFilter, setTenantFilter] = useState<'all' | 'saas' | 'standalone'>('all');
+
+  const generateStandaloneGuide = (tenant: Tenant) => {
+    return `# 🚀 دليل استضافة وتشغيل المنصة المستقلة للمعلم: ${tenant.name}
+تاريخ الإصدار: ${new Date().toLocaleDateString('ar-EG')}
+الدومين المستهدف: ${tenant.customDomain || tenant.subdomain + '.fahmni.me'}
+
+---
+
+## 📌 الخطوة 1: تجهيز ملف البيئة (.env)
+تأكد من وجود ملف \`.env\` في المجلد الرئيسي للمشروع وتحقّق من تضمين البيانات التالية:
+
+\`\`\`env
+VITE_TENANT_ID=${tenant.subdomain}
+VITE_CUSTOM_DOMAIN=${tenant.customDomain || tenant.subdomain + '.fahmni.me'}
+VITE_FIREBASE_CONFIG='${tenant.firebaseConfig || ''}'
+VITE_SUPABASE_URL=${tenant.supabaseUrl || ''}
+VITE_SUPABASE_ANON_KEY=${tenant.supabaseAnonKey || ''}
+VITE_STANDALONE_MODE=true
+\`\`\`
+
+---
+
+## 📌 الخطوة 2: الخيارات المتاحة للاستضافة (Deployment Options)
+
+### 1️⃣ الاستضافة على Hostinger / CPanel (استضافة مشتركة)
+1. قم بتشغيل الأمر \`npm run build\` على جهازك لتوليد مجلد الإنتاج \`dist\`.
+2. قم بضغط محتويات مجلد \`dist\` في ملف ZIP.
+3. افتح لوحة تحكم CPanel أو Hostinger واذهب إلى **File Manager -> public_html**.
+4. ارفع محتويات المجلد داخل \`public_html\`.
+5. أنشئ ملف باسم \`.htaccess\` وضع به الكود التالي لضمان عمل الروابط بشكل صحيح (SPA Rewrite):
+
+\`\`\`apache
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^index\\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>
+\`\`\`
+
+---
+
+### 2️⃣ الاستضافة المجانية أو السحابية على Vercel / Netlify / Cloudflare Pages
+1. قم برفع كود المشروع على حساب GitHub الخاص بك.
+2. افتح [Vercel](https://vercel.com) أو [Netlify](https://netlify.com) واختيار **Import Project**.
+3. أضف المتغيرات الموجودة بملف \`.env\` في قسم **Environment Variables**.
+4. اضغط **Deploy** وسيتم تشغيل المنصة في ثوانٍ!
+
+---
+
+### 3️⃣ الاستضافة على سيرفر خاص (VPS / Nginx)
+1. ثبت Node.js و Nginx على السيرفر.
+2. قم بعمل \`npm run build\` ثم تشغيل سيرفر المعاينة بواسطة Nginx:
+
+\`\`\`nginx
+server {
+    listen 80;
+    server_name ${tenant.customDomain || tenant.subdomain + '.fahmni.me'};
+
+    location / {
+        root /var/www/fahmni/dist;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+}
+\`\`\`
+
+---
+
+🎉 **تهانينا! منصة ${tenant.name} الآن تعمل بحريّة كاملة وعلى استضافتك الخاصة!**
+`;
+  };
+
+  const downloadEnvFile = (tenant: Tenant) => {
+    const envContent = `# =======================================================
+# Standalone Environment Config for Tenant: ${tenant.name}
+# Subdomain / ID: ${tenant.subdomain}
+# Custom Domain: ${tenant.customDomain || tenant.subdomain + '.fahmni.me'}
+# Generated Date: ${new Date().toLocaleString('ar-EG')}
+# =======================================================
+
+VITE_TENANT_ID=${tenant.subdomain}
+VITE_CUSTOM_DOMAIN=${tenant.customDomain || tenant.subdomain + '.fahmni.me'}
+VITE_FIREBASE_CONFIG=${tenant.firebaseConfig || ''}
+VITE_SUPABASE_URL=${tenant.supabaseUrl || ''}
+VITE_SUPABASE_ANON_KEY=${tenant.supabaseAnonKey || ''}
+VITE_STANDALONE_MODE=true
+`;
+    const blob = new Blob([envContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `.env`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadFirebaseJson = (tenant: Tenant) => {
+    let jsonStr = tenant.firebaseConfig || '{}';
+    try {
+      jsonStr = JSON.stringify(JSON.parse(tenant.firebaseConfig), null, 2);
+    } catch (e) {}
+    const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `firebase-applet-config.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadDeploymentGuide = (tenant: Tenant) => {
+    const guideText = generateStandaloneGuide(tenant);
+    const blob = new Blob([guideText], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `DEPLOYMENT_GUIDE_${tenant.subdomain}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadExportScript = (tenant: Tenant) => {
+    const scriptContent = `@echo off
+echo =======================================================
+echo  Publishing & Exporting Standalone Package: ${tenant.name}
+echo =======================================================
+echo.
+echo 1. Cleaning past builds...
+call npm run clean 2>nul
+echo 2. Building production bundle...
+call npm run build
+if %errorlevel% neq 0 (
+    echo [ERROR] Build failed! Check console errors.
+    pause
+    exit /b %errorlevel%
+)
+echo.
+echo 3. Packaging dist directory into standalone ZIP...
+powershell -Command "Compress-Archive -Path dist/* -DestinationPath standalone-bundle-${tenant.subdomain}.zip -Force"
+echo.
+echo [SUCCESS] Package created successfully: standalone-bundle-${tenant.subdomain}.zip
+pause
+`;
+    const blob = new Blob([scriptContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `export-standalone-${tenant.subdomain}.bat`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const handleExportStandalonePackage = (tenant: Tenant) => {
     const envContent = `# =======================================================
@@ -874,9 +1030,51 @@ VITE_STANDALONE_MODE=true
           ))}
         </div>
 
+        {/* Filter Bar */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/[0.02] border border-white/[0.06] p-4 rounded-2xl">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black text-gray-400">تصفية المنصات:</span>
+            <div className="flex bg-black/40 border border-white/10 rounded-xl p-1 gap-1">
+              <button
+                type="button"
+                onClick={() => setTenantFilter('all')}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  tenantFilter === 'all' ? 'bg-brand-blue text-white shadow-md' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                جميع المنصات ({tenants.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTenantFilter('saas')}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  tenantFilter === 'saas' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                سحابية SaaS ({tenants.filter((t) => !t.isStandalone).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTenantFilter('standalone')}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  tenantFilter === 'standalone' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                مستقلة مباعة Standalone ({tenants.filter((t) => t.isStandalone).length})
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* ═══ Tenants Grid ═══ */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {tenants.map((tenant, i) => (
+          {tenants
+            .filter((t) => {
+              if (tenantFilter === 'saas') return !t.isStandalone;
+              if (tenantFilter === 'standalone') return t.isStandalone;
+              return true;
+            })
+            .map((tenant, i) => (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -892,7 +1090,19 @@ VITE_STANDALONE_MODE=true
 
               <div className="flex justify-between items-start">
                 <div className="space-y-1 flex-1 min-w-0">
-                  <h3 className="font-black text-lg text-white truncate">{tenant.name}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-black text-lg text-white truncate">{tenant.name}</h3>
+                    {tenant.isStandalone ? (
+                      <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full font-bold">
+                        مستقلة 🏷️
+                      </span>
+                    ) : (
+                      <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-full font-bold">
+                        سحابية ☁️
+                      </span>
+                    )}
+                  </div>
+
                   <a
                     href={`https://${tenant.subdomain}.fahmni.me`}
                     target="_blank"
@@ -903,8 +1113,22 @@ VITE_STANDALONE_MODE=true
                     {tenant.subdomain}.fahmni.me
                     <ExternalLink size={12} />
                   </a>
+
+                  {tenant.customDomain && (
+                    <div className="text-[11px] text-emerald-400 font-mono flex items-center gap-1 mt-0.5" dir="ltr">
+                      <Globe size={12} /> {tenant.customDomain}
+                    </div>
+                  )}
                 </div>
+
                 <div className="flex gap-1.5 mr-3" dir="ltr">
+                  <button
+                    onClick={() => setExporterTenant(tenant)}
+                    className="p-2 bg-purple-500/10 hover:bg-purple-500 text-purple-400 hover:text-white rounded-lg transition-all cursor-pointer"
+                    title="تصدير حزمة المنصة المستقلة للمعلم (1-Click Standalone Exporter)"
+                  >
+                    <Download size={15} />
+                  </button>
                   <button
                     onClick={async () => {
                       if (
@@ -923,7 +1147,7 @@ VITE_STANDALONE_MODE=true
                         }
                       }
                     }}
-                    className="p-2 bg-white/5 hover:bg-red-500/20 text-gray-500 hover:text-red-400 rounded-lg transition-all"
+                    className="p-2 bg-white/5 hover:bg-red-500/20 text-gray-500 hover:text-red-400 rounded-lg transition-all cursor-pointer"
                     title="حذف المنصة"
                   >
                     <Trash2 size={15} />
@@ -934,7 +1158,7 @@ VITE_STANDALONE_MODE=true
                         setSelectedStorageTenant(tenant);
                         fetchStorageStats(tenant);
                       }}
-                      className="p-2 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white rounded-lg transition-all"
+                      className="p-2 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white rounded-lg transition-all cursor-pointer"
                       title="إدارة التخزين والدورة الدراسية"
                     >
                       <Database size={15} />
@@ -945,7 +1169,7 @@ VITE_STANDALONE_MODE=true
                       setActiveTab('basics');
                       setEditingTenant(tenant);
                     }}
-                    className="p-2 bg-brand-blue/10 hover:bg-brand-blue text-brand-blue hover:text-white rounded-lg transition-all"
+                    className="p-2 bg-brand-blue/10 hover:bg-brand-blue text-brand-blue hover:text-white rounded-lg transition-all cursor-pointer"
                     title="تعديل المنصة"
                   >
                     <Edit3 size={15} />
@@ -2297,6 +2521,166 @@ VITE_STANDALONE_MODE=true
                       <Upload size={16} />🚀 نشر التحديث الآن للمنصات المستقلة
                     </>
                   )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ═══════════════════════════════════════════════════════ */}
+      {/* ═══ 1-Click Standalone Exporter Suite Modal ═══ */}
+      {/* ═══════════════════════════════════════════════════════ */}
+      <AnimatePresence>
+        {exporterTenant && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setExporterTenant(null)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-2xl bg-[#0a0f1e] border border-purple-500/30 rounded-3xl p-6 shadow-2xl space-y-6 text-right overflow-hidden max-h-[92vh] flex flex-col"
+              dir="rtl"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-purple-500/20 text-purple-400 flex items-center justify-center border border-purple-500/30">
+                    <Download size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-white">مركز تصدير وتمليك المنصة المستقلة</h3>
+                    <p className="text-xs text-purple-300 font-bold">
+                      منصة: {exporterTenant.name} ({exporterTenant.customDomain || exporterTenant.subdomain + '.fahmni.me'})
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setExporterTenant(null)}
+                  className="p-2 text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-all"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-4 overflow-y-auto pr-1 flex-1">
+                {/* Information Alert */}
+                <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-2xl flex items-start gap-3">
+                  <Zap size={20} className="text-purple-400 shrink-0 mt-0.5" />
+                  <div className="text-xs space-y-1">
+                    <span className="font-black text-purple-300 block">حزمة البيع والتمليك المكتملة للمعلم:</span>
+                    <p className="text-gray-300 leading-relaxed">
+                      هذا المركز يتيح لك استخراج كافة ملفات الضبط والإعداد السحابي الخاصة بالمعلم وتسليمها له لرفع منصته على استضافته ودومينه الخاص بالكامل مع إمكانية تحديثها سحابياً.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Grid of Downloadable Resources */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* Option 1: .env File */}
+                  <div className="p-4 bg-white/[0.03] border border-white/10 rounded-2xl space-y-2.5 hover:border-emerald-500/40 transition-all group">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-white flex items-center gap-1.5">
+                        <FileText size={15} className="text-emerald-400" /> ملف البيئة (.env)
+                      </span>
+                      <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-md font-bold">مسبق الإعداد</span>
+                    </div>
+                    <p className="text-[11px] text-gray-400">يتضمن مفاتيح Firebase & Supabase والمعرف الخاص بالمنصة.</p>
+                    <button
+                      type="button"
+                      onClick={() => downloadEnvFile(exporterTenant)}
+                      className="w-full py-2.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Download size={14} /> تنزيل ملف .env
+                    </button>
+                  </div>
+
+                  {/* Option 2: firebase-applet-config.json */}
+                  <div className="p-4 bg-white/[0.03] border border-white/10 rounded-2xl space-y-2.5 hover:border-blue-500/40 transition-all group">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-white flex items-center gap-1.5">
+                        <Database size={15} className="text-blue-400" /> إعدادات Firebase JSON
+                      </span>
+                      <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-md font-bold">JSON</span>
+                    </div>
+                    <p className="text-[11px] text-gray-400">ملف الإعدادات المباشر المخصص لقاعدة بيانات المعلم.</p>
+                    <button
+                      type="button"
+                      onClick={() => downloadFirebaseJson(exporterTenant)}
+                      className="w-full py-2.5 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Download size={14} /> تنزيل ملف Config JSON
+                    </button>
+                  </div>
+
+                  {/* Option 3: DEPLOYMENT_GUIDE.md */}
+                  <div className="p-4 bg-white/[0.03] border border-white/10 rounded-2xl space-y-2.5 hover:border-amber-500/40 transition-all group">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-white flex items-center gap-1.5">
+                        <BookOpen size={15} className="text-amber-400" /> دليل التثبيت والتسليم
+                      </span>
+                      <span className="text-[10px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-md font-bold">MD Guide</span>
+                    </div>
+                    <p className="text-[11px] text-gray-400">دليل الاستضافة الشامل لرفع المنصة على Hostinger, CPanel, Vercel, VPS.</p>
+                    <button
+                      type="button"
+                      onClick={() => downloadDeploymentGuide(exporterTenant)}
+                      className="w-full py-2.5 bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Download size={14} /> تنزيل دليل الاستضافة (MD)
+                    </button>
+                  </div>
+
+                  {/* Option 4: Packaging Batch Script */}
+                  <div className="p-4 bg-white/[0.03] border border-white/10 rounded-2xl space-y-2.5 hover:border-purple-500/40 transition-all group">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-white flex items-center gap-1.5">
+                        <Zap size={15} className="text-purple-400" /> سكربت التجميع الآلي (.bat)
+                      </span>
+                      <span className="text-[10px] bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded-md font-bold">Automatic ZIP</span>
+                    </div>
+                    <p className="text-[11px] text-gray-400">سكربت تنفيذي يبني ويضغط محتويات المشروع لـ ZIP جاهز للتسليم.</p>
+                    <button
+                      type="button"
+                      onClick={() => downloadExportScript(exporterTenant)}
+                      className="w-full py-2.5 bg-purple-500/10 hover:bg-purple-500 text-purple-400 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Download size={14} /> تنزيل سكربت التجميع (.bat)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Direct Link to Test */}
+                <div className="p-4 bg-black/40 border border-white/10 rounded-2xl flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-black text-white block">تجربة وتشغيل المنصة محلياً:</span>
+                    <span className="text-[11px] text-brand-blue font-mono">http://{exporterTenant.subdomain}.localhost:3000</span>
+                  </div>
+                  <a
+                    href={`http://${exporterTenant.subdomain}.localhost:3000`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2 bg-brand-blue hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                  >
+                    فتح للتجربة <ExternalLink size={13} />
+                  </a>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="pt-3 border-t border-white/10 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setExporterTenant(null)}
+                  className="px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all"
+                >
+                  إغلاق النافذة
                 </button>
               </div>
             </motion.div>
