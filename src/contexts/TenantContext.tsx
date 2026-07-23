@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { initTenantApp, masterDb } from '../lib/firebase';
 import { initTenantSupabase } from '../lib/supabase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { applyFruitTheme } from '../constants/fruitThemes';
 import type { FruitId } from '../constants/fruitThemes';
 import { WifiOff } from 'lucide-react';
@@ -214,6 +214,27 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           // Cache for next visit
           setCachedTenant(extractedTenant!, data);
         } else {
+          // Document by ID not found — perform Custom Domain Reverse Lookup
+          try {
+            const cleanHost = window.location.hostname.replace(/^www\./, '');
+            const domainQuery = query(collection(masterDb, 'tenants'), where('customDomain', '==', cleanHost));
+            const querySnap = await getDocs(domainQuery);
+            if (!querySnap.empty) {
+              const matchedDoc = querySnap.docs[0];
+              const data = matchedDoc.data();
+              const resolvedId = matchedDoc.id;
+              setTenantId(resolvedId);
+              setTenantData(data);
+              applyTenantBranding(data);
+              initFirebaseFromTenantData(data);
+              initTenantSupabase(data);
+              setCachedTenant(extractedTenant!, data);
+              return;
+            }
+          } catch (domainErr) {
+            console.warn('Custom domain lookup notice:', domainErr);
+          }
+
           // Document truly doesn't exist - only then show not found
           if (!cached) {
             console.warn(`Tenant ${extractedTenant} not found in Firestore.`);
