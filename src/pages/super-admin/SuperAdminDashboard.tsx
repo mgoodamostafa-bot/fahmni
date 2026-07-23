@@ -38,6 +38,7 @@ import {
   SlidersHorizontal,
   FileText,
   AlertTriangle,
+  Download,
 } from 'lucide-react';
 import { compressImage, removeWhiteBgFromBase64 } from '../../utils/imageCompression';
 
@@ -82,10 +83,12 @@ interface Tenant {
   removeTeacherPhotoBg?: boolean;
   vodafoneCashNumber?: string;
   instapayAddress?: string;
+  customDomain?: string;
+  isStandalone?: boolean;
   createdAt: any;
 }
 
-type TabId = 'basics' | 'branding' | 'landing' | 'teacher' | 'social' | 'controls';
+type TabId = 'basics' | 'branding' | 'landing' | 'teacher' | 'social' | 'controls' | 'standalone';
 
 export const SuperAdminDashboard = () => {
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -120,6 +123,64 @@ export const SuperAdminDashboard = () => {
     externalLinks: number;
     estimatedSpaceMB: number;
   } | null>(null);
+
+  // Standalone release publisher states
+  const [isReleaseModalOpen, setIsReleaseModalOpen] = useState(false);
+  const [releaseVersion, setReleaseVersion] = useState('v2.5.0');
+  const [releaseNotes, setReleaseNotes] = useState('تحديث شامل لنظام الحضور الذكي بالـ QR، زيادة سرعة الماسح، وإصلاح إحصائيات المجموعات وربط الدومينات الخاصة.');
+  const [releaseZipUrl, setReleaseZipUrl] = useState('');
+  const [publishingRelease, setPublishingRelease] = useState(false);
+
+  const handleExportStandalonePackage = (tenant: Tenant) => {
+    const envContent = `# =======================================================
+# Standalone Environment Config for Tenant: ${tenant.name}
+# Subdomain / ID: ${tenant.subdomain}
+# Custom Domain: ${tenant.customDomain || tenant.subdomain + '.fahmni.me'}
+# Generated Date: ${new Date().toLocaleString('ar-EG')}
+# =======================================================
+
+VITE_TENANT_ID=${tenant.subdomain}
+VITE_CUSTOM_DOMAIN=${tenant.customDomain || tenant.subdomain + '.fahmni.me'}
+VITE_FIREBASE_CONFIG=${tenant.firebaseConfig || ''}
+VITE_SUPABASE_URL=${tenant.supabaseUrl || ''}
+VITE_SUPABASE_ANON_KEY=${tenant.supabaseAnonKey || ''}
+VITE_STANDALONE_MODE=true
+`;
+
+    const blob = new Blob([envContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `standalone-config-${tenant.subdomain}.env`;
+    a.click();
+    URL.revokeObjectURL(url);
+    alert(`✅ تم تصدير حزمة إعدادات المنصة المستقلة (${tenant.name}) بنجاح!`);
+  };
+
+  const handlePublishRelease = async () => {
+    if (!releaseVersion || !releaseNotes) {
+      alert('يرجى إدخال رقم الإصدار وملاحظات التحديث');
+      return;
+    }
+    setPublishingRelease(true);
+    try {
+      const releaseData = {
+        version: releaseVersion,
+        notes: releaseNotes,
+        zipUrl: releaseZipUrl,
+        publishedAt: new Date().toISOString(),
+      };
+      await setDoc(doc(masterDb, 'system_releases', releaseVersion.replace(/\./g, '_')), releaseData);
+      await setDoc(doc(masterDb, 'system_releases', 'latest'), releaseData);
+      alert(`🚀 تم نشر وتوجيه التحديث (${releaseVersion}) بنجاح لجميع المنصات المستقلة!`);
+      setIsReleaseModalOpen(false);
+    } catch (err: any) {
+      console.error('Error publishing release:', err);
+      alert('حدث خطأ أثناء نشر التحديث: ' + err.message);
+    } finally {
+      setPublishingRelease(false);
+    }
+  };
 
   const getTenantFirebaseApp = (tenant: Tenant) => {
     if (!tenant.firebaseConfig) return null;
@@ -742,8 +803,14 @@ export const SuperAdminDashboard = () => {
                 إعدادات المنصة
               </Link>
               <button
+                onClick={() => setIsReleaseModalOpen(true)}
+                className="px-5 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 rounded-2xl font-black shadow-lg shadow-emerald-500/20 hover:shadow-xl hover:shadow-emerald-500/30 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Upload size={16} /> نشر تحديث للمنصات المستقلة
+              </button>
+              <button
                 onClick={openNewTenantModal}
-                className="px-6 py-3.5 bg-gradient-to-r from-brand-blue to-blue-600 text-white rounded-2xl font-black shadow-lg shadow-brand-blue/25 hover:shadow-xl hover:shadow-brand-blue/30 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
+                className="px-6 py-3.5 bg-gradient-to-r from-brand-blue to-blue-600 text-white rounded-2xl font-black shadow-lg shadow-brand-blue/25 hover:shadow-xl hover:shadow-brand-blue/30 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Zap size={16} /> إضافة منصة جديدة
               </button>
@@ -1078,6 +1145,25 @@ export const SuperAdminDashboard = () => {
                           .fahmni.me
                         </div>
                       </div>
+                    </div>
+
+                    {/* Custom Domain */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-emerald-400 font-bold flex items-center gap-1.5">
+                        <Globe size={13} /> الدومين الخاص بالمعلم (Custom Domain)
+                      </label>
+                      <input
+                        value={editingTenant.customDomain || ''}
+                        onChange={(e) =>
+                          setEditingTenant({ ...editingTenant, customDomain: e.target.value })
+                        }
+                        className="w-full bg-black/30 border border-emerald-500/20 rounded-xl px-4 py-3 text-white focus:border-emerald-500 focus:outline-none text-sm transition-colors"
+                        placeholder="مثال: hossamalsalhy.com أو eng.fahmni.me"
+                        dir="ltr"
+                      />
+                      <p className="text-[10px] text-gray-500">
+                        ربط النطاق الخاص المباشر بدلاً من النطاق الفرعي
+                      </p>
                     </div>
 
                     {/* Firebase Config */}
@@ -1621,6 +1707,75 @@ export const SuperAdminDashboard = () => {
                     </div>
                   </div>
                 )}
+
+                {/* 7. Standalone Exporter & Domains Tab */}
+                {activeTab === 'standalone' && (
+                  <div className="space-y-5">
+                    {/* Standalone Export & Config Card */}
+                    <div className="p-5 bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent border border-emerald-500/20 rounded-2xl space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                          <Upload size={20} />
+                        </div>
+                        <div>
+                          <h4 className="text-base font-black text-white">تصدير المنصة المستقلة للمعلم</h4>
+                          <p className="text-xs text-gray-400">
+                            توليد ملفات الإعدادات والربط السحابي لهذه المنصة لبيعها كنسخة مدى الحياة
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Custom domain input inside standalone tab */}
+                      <div className="space-y-2 pt-2 border-t border-white/10">
+                        <label className="text-xs font-bold text-emerald-400">الدومين الخاص المربوط بالمنصة</label>
+                        <input
+                          type="text"
+                          value={editingTenant.customDomain || ''}
+                          onChange={(e) => setEditingTenant({ ...editingTenant, customDomain: e.target.value })}
+                          className="w-full bg-black/40 border border-emerald-500/30 rounded-xl px-4 py-3 text-white text-sm focus:border-emerald-500 focus:outline-none"
+                          placeholder="مثال: hossamalsalhy.com أو eng.fahmni.me"
+                          dir="ltr"
+                        />
+                      </div>
+
+                      {/* Is Standalone Toggle */}
+                      <div className="flex items-center justify-between p-3 bg-black/30 rounded-xl border border-white/5">
+                        <div>
+                          <span className="text-xs font-bold text-white block">حالة الاستضافة المباشرة</span>
+                          <span className="text-[10px] text-gray-400">تحديد هذه المنصة كمنصة مستقلة على استضافة خاصة</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditingTenant({ ...editingTenant, isStandalone: !editingTenant.isStandalone })}
+                          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                            editingTenant.isStandalone
+                              ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
+                              : 'bg-white/10 text-gray-400'
+                          }`}
+                        >
+                          {editingTenant.isStandalone ? 'مستقلة (Self-Hosted)' : 'سحابية (SaaS Shared)'}
+                        </button>
+                      </div>
+
+                      {/* Action Button */}
+                      <button
+                        type="button"
+                        onClick={() => handleExportStandalonePackage(editingTenant)}
+                        className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 rounded-xl font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all cursor-pointer"
+                      >
+                        <Download size={16} /> تصدير حزمة إعدادات (.env) المنصة المستقلة
+                      </button>
+                    </div>
+
+                    {/* Information Box */}
+                    <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl space-y-2">
+                      <h5 className="text-xs font-black text-blue-400">💡 كيفية تشغيل التحديثات للمنصات المستقلة</h5>
+                      <p className="text-[11px] text-gray-300 leading-relaxed">
+                        تتيح لك منصة فهمان نشر التحديثات البرمجية فورياً من زر <strong>"🚀 نشر تحديث للمنصات المستقلة"</strong> الموجود بأعلى لوحة تحكم السوبر أدمن. تتلقى جميع المنصات المباعة التحديثات تلقائياً من خادم Firestore الموحد دون الحاجة لتعديل أكواد المعلم.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Modal Footer */}
@@ -2028,6 +2183,113 @@ export const SuperAdminDashboard = () => {
                   </div>
                 </div>
               )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ═══════════════════════════════════════════════════════ */}
+      {/* ═══ Standalone Update Release Publisher Modal ═══ */}
+      {/* ═══════════════════════════════════════════════════════ */}
+      <AnimatePresence>
+        {isReleaseModalOpen && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsReleaseModalOpen(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-xl bg-[#0a0f1e] border border-emerald-500/20 rounded-3xl p-6 shadow-2xl space-y-5 text-right overflow-hidden"
+              dir="rtl"
+            >
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                    <Upload size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-white">نشر وتطبيق تحديث سحابي جديد</h3>
+                    <p className="text-xs text-gray-400">إرسال التحديث لجميع المنصات المستقلة المشتراة</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsReleaseModalOpen(false)}
+                  className="p-2 text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-all"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-300">رقم الإصدار (Version Tag)</label>
+                  <input
+                    type="text"
+                    value={releaseVersion}
+                    onChange={(e) => setReleaseVersion(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white font-mono text-sm focus:border-emerald-500 focus:outline-none"
+                    placeholder="v2.5.0"
+                    dir="ltr"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-300">ملاحظات التحديث والميزات الجديدة</label>
+                  <textarea
+                    value={releaseNotes}
+                    onChange={(e) => setReleaseNotes(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-xs h-28 focus:border-emerald-500 focus:outline-none resize-none"
+                    placeholder="تفاصيل التحديث والميزات الجديدة المضافة..."
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-300">رابط حزمة التحديث المباشرة (ZIP Package URL - اختياري)</label>
+                  <input
+                    type="url"
+                    value={releaseZipUrl}
+                    onChange={(e) => setReleaseZipUrl(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-xs font-mono focus:border-emerald-500 focus:outline-none"
+                    placeholder="https://releases.fahmni.me/v2.5.0.zip"
+                    dir="ltr"
+                  />
+                  <p className="text-[10px] text-gray-500">
+                    يمكن ترك هذا الرابط فارغاً في حالة التحديثات السحابية الفورية المنشورة على GitHub / Vercel
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-white/10 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsReleaseModalOpen(false)}
+                  className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-bold transition-all"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="button"
+                  disabled={publishingRelease}
+                  onClick={handlePublishRelease}
+                  className="flex-2 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 rounded-xl text-xs font-black shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {publishingRelease ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" /> جاري نشر التحديث...
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={16} />🚀 نشر التحديث الآن للمنصات المستقلة
+                    </>
+                  )}
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
