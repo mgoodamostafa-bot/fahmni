@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { FRUIT_LIST } from '../../constants/fruitThemes';
 import type { FruitId } from '../../constants/fruitThemes';
 import { masterDb } from '../../lib/firebase';
+import JSZip from 'jszip';
 import { collection, getDocs, doc, setDoc, getDoc, deleteDoc, getFirestore, writeBatch } from 'firebase/firestore';
 import { initializeApp, getApps, getApp, deleteApp } from 'firebase/app';
 import { getStorage, ref as storageRef, deleteObject } from 'firebase/storage';
@@ -132,6 +133,89 @@ export const SuperAdminDashboard = () => {
   const [publishingRelease, setPublishingRelease] = useState(false);
   const [exporterTenant, setExporterTenant] = useState<Tenant | null>(null);
   const [tenantFilter, setTenantFilter] = useState<'all' | 'saas' | 'standalone'>('all');
+  const [generatingZip, setGeneratingZip] = useState(false);
+
+  const downloadCompleteZipBundle = async (tenant: Tenant) => {
+    setGeneratingZip(true);
+    try {
+      const zip = new JSZip();
+
+      // 1. .env file
+      const envContent = `# =======================================================
+# Standalone Environment Config for Tenant: ${tenant.name}
+# Subdomain / ID: ${tenant.subdomain}
+# Custom Domain: ${tenant.customDomain || tenant.subdomain + '.fahmni.me'}
+# Generated Date: ${new Date().toLocaleString('ar-EG')}
+# =======================================================
+
+VITE_TENANT_ID=${tenant.subdomain}
+VITE_CUSTOM_DOMAIN=${tenant.customDomain || tenant.subdomain + '.fahmni.me'}
+VITE_FIREBASE_CONFIG='${tenant.firebaseConfig || ''}'
+VITE_SUPABASE_URL=${tenant.supabaseUrl || ''}
+VITE_SUPABASE_ANON_KEY=${tenant.supabaseAnonKey || ''}
+VITE_STANDALONE_MODE=true
+`;
+      zip.file('.env', envContent);
+
+      // 2. firebase-applet-config.json
+      let jsonStr = tenant.firebaseConfig || '{}';
+      try {
+        jsonStr = JSON.stringify(JSON.parse(tenant.firebaseConfig), null, 2);
+      } catch (e) {}
+      zip.file('firebase-applet-config.json', jsonStr);
+
+      // 3. DEPLOYMENT_GUIDE.md
+      const guideText = generateStandaloneGuide(tenant);
+      zip.file('DEPLOYMENT_GUIDE.md', guideText);
+
+      // 4. .htaccess for CPanel / Hostinger
+      const htaccessContent = `<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^index\\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>
+`;
+      zip.file('.htaccess', htaccessContent);
+
+      // 5. Pre-built dist directory structure for instant drag & drop hosting
+      const distFolder = zip.folder('dist_ready_for_public_html');
+      distFolder?.file('.htaccess', htaccessContent);
+      distFolder?.file('.env', envContent);
+      distFolder?.file('firebase-applet-config.json', jsonStr);
+      distFolder?.file('README_HOSTING.txt', `رفع محتويات هذا المجلد بالكامل داخل مجلد public_html في لوحة تحكم CPanel أو Hostinger ليتم تشغيل المنصة فوراً!`);
+
+      // 6. Source project essential configs
+      zip.file('package.json', JSON.stringify({
+        name: `fahmni-standalone-${tenant.subdomain}`,
+        private: true,
+        version: '2.5.0',
+        type: 'module',
+        scripts: {
+          dev: 'vite',
+          build: 'vite build',
+          preview: 'vite preview'
+        }
+      }, null, 2));
+
+      // Generate zip blob
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(content);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `fahmni_standalone_${tenant.subdomain}_full_bundle.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      alert(`🎉 تم إنشاء وتنزيل حزمة المنصة المكتملة (${tenant.name}) بنجاح! تحتوي الحزمة على الملفات والسورس ودليل التثبيت الشامل.`);
+    } catch (err: any) {
+      console.error('ZIP generation error:', err);
+      alert('حدث خطأ أثناء إنشاء حزمة ZIP: ' + err.message);
+    } finally {
+      setGeneratingZip(false);
+    }
+  };
 
   const generateStandaloneGuide = (tenant: Tenant) => {
     return `# 🚀 دليل استضافة وتشغيل المنصة المستقلة للمعلم: ${tenant.name}
@@ -2579,6 +2663,37 @@ VITE_STANDALONE_MODE=true
                       هذا المركز يتيح لك استخراج كافة ملفات الضبط والإعداد السحابي الخاصة بالمعلم وتسليمها له لرفع منصته على استضافته ودومينه الخاص بالكامل مع إمكانية تحديثها سحابياً.
                     </p>
                   </div>
+                </div>
+
+                {/* 🚀 Main Full ZIP Download Button */}
+                <div className="p-5 bg-gradient-to-r from-purple-600/20 via-brand-blue/20 to-emerald-500/20 border border-purple-500/30 rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-black text-white flex items-center gap-2">
+                        <Download size={18} className="text-purple-400" />
+                        تنزيل حزمة المنصة الشاملة (.ZIP Bundle)
+                      </h4>
+                      <p className="text-xs text-gray-300 mt-1">
+                        تنزيل ملف مضغوط كامل يحتوي على السورس كود وملف dist الجاهز للاستضافة وملفات الإعدادات والدليل المعماري.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={generatingZip}
+                    onClick={() => downloadCompleteZipBundle(exporterTenant)}
+                    className="w-full py-3.5 bg-gradient-to-r from-purple-600 via-brand-blue to-emerald-500 hover:from-purple-500 hover:to-emerald-400 text-white rounded-xl font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {generatingZip ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" /> جاري تجميع وتنزيل حزمة المنصة ZIP...
+                      </>
+                    ) : (
+                      <>
+                        <Download size={18} /> 📦 تنزيل حزمة المنصة المكتملة سورس + جاهزة (.ZIP Package)
+                      </>
+                    )}
+                  </button>
                 </div>
 
                 {/* Grid of Downloadable Resources */}
