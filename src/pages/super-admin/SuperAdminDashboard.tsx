@@ -180,14 +180,22 @@ VITE_STANDALONE_MODE=true
 `;
       zip.file('.htaccess', htaccessContent);
 
-      // 5. Pre-built dist directory structure for instant drag & drop hosting
+      // 5. vercel.json for 1-Click Vercel Deployment
+      const vercelJsonContent = JSON.stringify({
+        version: 2,
+        rewrites: [{ source: "/(.*)", destination: "/index.html" }]
+      }, null, 2);
+      zip.file('vercel.json', vercelJsonContent);
+
+      // 6. Pre-built dist directory structure for instant drag & drop hosting
       const distFolder = zip.folder('dist_ready_for_public_html');
       distFolder?.file('.htaccess', htaccessContent);
       distFolder?.file('.env', envContent);
       distFolder?.file('firebase-applet-config.json', jsonStr);
-      distFolder?.file('README_HOSTING.txt', `رفع محتويات هذا المجلد بالكامل داخل مجلد public_html في لوحة تحكم CPanel أو Hostinger ليتم تشغيل المنصة فوراً!`);
+      distFolder?.file('vercel.json', vercelJsonContent);
+      distFolder?.file('README_HOSTING.txt', `رفع محتويات هذا المجلد بالكامل داخل مجلد public_html في لوحة تحكم CPanel أو Hostinger أو سحبها بـ Netlify Drop ليتم تشغيل المنصة فوراً!`);
 
-      // 6. Source project essential configs
+      // 7. Complete package.json with full build dependencies
       zip.file('package.json', JSON.stringify({
         name: `fahmni-standalone-${tenant.subdomain}`,
         private: true,
@@ -197,8 +205,75 @@ VITE_STANDALONE_MODE=true
           dev: 'vite',
           build: 'vite build',
           preview: 'vite preview'
+        },
+        dependencies: {
+          "@dnd-kit/core": "^6.3.1",
+          "@dnd-kit/sortable": "^10.0.0",
+          "@dnd-kit/utilities": "^3.2.2",
+          "@fingerprintjs/fingerprintjs": "^5.2.0",
+          "@hookform/resolvers": "^5.4.0",
+          "@tanstack/react-query": "^5.101.0",
+          "clsx": "^2.1.1",
+          "date-fns": "^4.1.0",
+          "dotenv": "^17.2.3",
+          "firebase": "^12.11.0",
+          "framer-motion": "^12.38.0",
+          "html5-qrcode": "^2.3.8",
+          "lucide-react": "^0.546.0",
+          "motion": "^12.23.24",
+          "pdf-lib": "^1.17.1",
+          "pdfjs-dist": "^4.10.38",
+          "qrcode.react": "^4.2.0",
+          "react": "^19.0.0",
+          "react-dom": "^19.0.0",
+          "react-hook-form": "^7.79.0",
+          "react-player": "^3.4.0",
+          "react-router-dom": "^7.13.2",
+          "recharts": "^3.8.0",
+          "tailwind-merge": "^3.5.0",
+          "vite": "^6.2.0",
+          "zod": "^4.4.3"
+        },
+        devDependencies: {
+          "@types/node": "^22.14.0",
+          "@types/react": "^19.2.17",
+          "@types/react-dom": "^19.2.3",
+          "@vitejs/plugin-react": "^5.0.4",
+          "autoprefixer": "^10.4.21",
+          "esbuild": "^0.27.4",
+          "tailwindcss": "^4.1.14",
+          "typescript": "~5.8.2",
+          "vite": "^6.2.0"
         }
       }, null, 2));
+
+      // 8. vite.config.ts
+      zip.file('vite.config.ts', `import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  build: {
+    outDir: 'dist',
+    chunkSizeWarningLimit: 1600
+  }
+});
+`);
+
+      // 9. Root index.html
+      zip.file('index.html', `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>منصة فهماني التعليمية - ${tenant.name}</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+`);
 
       // Generate zip blob
       const content = await zip.generateAsync({ type: 'blob' });
