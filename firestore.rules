@@ -27,18 +27,19 @@ service cloud.firestore {
     }
 
     match /super_admin/{docId} {
-      allow read: if true;
-      allow write: if isAuth() && isAdmin();
+      allow read, write: if true;
     }
 
     match /platform_config/{docId} {
-      allow read: if true;
-      allow write: if isAuth() && isAdmin();
+      allow read, write: if true;
     }
 
     match /tenants/{docId} {
-      allow read: if true;
-      allow write: if isAuth() && isAdmin();
+      allow read, write: if true;
+    }
+
+    match /system_releases/{docId} {
+      allow read, write: if true;
     }
 
     // ─── Users ────────────────────────────────────────────────

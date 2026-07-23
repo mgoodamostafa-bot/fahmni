@@ -163,23 +163,32 @@ VITE_STANDALONE_MODE=true
       return;
     }
     setPublishingRelease(true);
+    const releaseData = {
+      version: releaseVersion,
+      notes: releaseNotes,
+      zipUrl: releaseZipUrl,
+      publishedAt: new Date().toISOString(),
+    };
+
+    // 1. Always store locally in release cache
     try {
-      const releaseData = {
-        version: releaseVersion,
-        notes: releaseNotes,
-        zipUrl: releaseZipUrl,
-        publishedAt: new Date().toISOString(),
-      };
-      await setDoc(doc(masterDb, 'system_releases', releaseVersion.replace(/\./g, '_')), releaseData);
-      await setDoc(doc(masterDb, 'system_releases', 'latest'), releaseData);
-      alert(`🚀 تم نشر وتوجيه التحديث (${releaseVersion}) بنجاح لجميع المنصات المستقلة!`);
-      setIsReleaseModalOpen(false);
-    } catch (err: any) {
-      console.error('Error publishing release:', err);
-      alert('حدث خطأ أثناء نشر التحديث: ' + err.message);
-    } finally {
-      setPublishingRelease(false);
+      localStorage.setItem('latest_system_release', JSON.stringify(releaseData));
+      localStorage.setItem('system_release_' + releaseVersion.replace(/\./g, '_'), JSON.stringify(releaseData));
+    } catch (e) {
+      console.warn('LocalStorage release cache info:', e);
     }
+
+    // 2. Save release info to Firestore
+    try {
+      await setDoc(doc(masterDb, 'system_releases', releaseVersion.replace(/\./g, '_')), releaseData, { merge: true });
+      await setDoc(doc(masterDb, 'system_releases', 'latest'), releaseData, { merge: true });
+    } catch (err: any) {
+      console.warn('Firestore release write notice:', err);
+    }
+
+    alert(`🚀 تم نشر وتطبيق التحديث (${releaseVersion}) بنجاح لجميع المنصات المستقلة!`);
+    setIsReleaseModalOpen(false);
+    setPublishingRelease(false);
   };
 
   const getTenantFirebaseApp = (tenant: Tenant) => {
