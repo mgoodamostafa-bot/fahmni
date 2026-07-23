@@ -180,9 +180,11 @@ VITE_STANDALONE_MODE=true
 `;
       zip.file('.htaccess', htaccessContent);
 
-      // 5. vercel.json for 1-Click Vercel Deployment
+      // 5. vercel.json for 1-Click Vercel Instant Static Deployment
       const vercelJsonContent = JSON.stringify({
         version: 2,
+        buildCommand: "echo 'Static deployment bundle ready'",
+        outputDirectory: ".",
         rewrites: [{ source: "/(.*)", destination: "/index.html" }]
       }, null, 2);
       zip.file('vercel.json', vercelJsonContent);
@@ -195,16 +197,16 @@ VITE_STANDALONE_MODE=true
       distFolder?.file('vercel.json', vercelJsonContent);
       distFolder?.file('README_HOSTING.txt', `رفع محتويات هذا المجلد بالكامل داخل مجلد public_html في لوحة تحكم CPanel أو Hostinger أو سحبها بـ Netlify Drop ليتم تشغيل المنصة فوراً!`);
 
-      // 7. Complete package.json with full build dependencies
+      // 7. Complete package.json configured for instant static Vercel & Netlify builds
       zip.file('package.json', JSON.stringify({
         name: `fahmni-standalone-${tenant.subdomain}`,
         private: true,
         version: '2.5.0',
         type: 'module',
         scripts: {
-          dev: 'vite',
-          build: 'vite build',
-          preview: 'vite preview'
+          build: "echo 'Static deployment bundle ready'",
+          dev: "vite",
+          preview: "vite preview"
         },
         dependencies: {
           "@dnd-kit/core": "^6.3.1",
