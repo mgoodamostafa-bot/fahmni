@@ -75,19 +75,33 @@ export const initTenantApp = (tenantConfig?: any) => {
     const masterDbId = firebaseConfig.firestoreDatabaseId || '(default)';
     const tenantDbId = tenantConfig?.firestoreDatabaseId || '(default)';
 
+    const isStandalone = typeof window !== 'undefined' && (
+      (window as any).VITE_STANDALONE_MODE === 'true' || 
+      import.meta.env.VITE_STANDALONE_MODE === 'true' ||
+      tenantConfig?.isStandalone
+    );
+
     // If no config provided, or it's the exact same project AND database, reuse masterApp
     if (
       !tenantConfig ||
-      !tenantConfig.apiKey ||
+      (!tenantConfig.apiKey && !isStandalone) ||
       (tenantConfig.projectId === firebaseConfig.projectId && tenantDbId === masterDbId)
     ) {
       app = masterApp;
       db = masterDb;
+    } else if (isStandalone && !tenantConfig?.apiKey) {
+      // Standalone platform without custom API key: initialize an isolated Firestore app instance
+      if (getApps().some((a) => a.name === 'STANDALONE')) {
+        app = getApp('STANDALONE');
+      } else {
+        app = initializeApp({ ...firebaseConfig, projectId: `standalone-${Date.now()}` }, 'STANDALONE');
+      }
+      db = getOrInitializeFirestore(app, '(default)');
     } else {
       if (getApps().some((a) => a.name === 'TENANT')) {
         app = getApp('TENANT');
-        const tenantDatabaseId = tenantConfig.firestoreDatabaseId; // Use exactly what config has (even if empty) or undefined
-        db = getOrInitializeFirestore(app, tenantDatabaseId || '(default)'); // but pass default to function if undefined
+        const tenantDatabaseId = tenantConfig.firestoreDatabaseId;
+        db = getOrInitializeFirestore(app, tenantDatabaseId || '(default)');
       } else {
         app = initializeApp(tenantConfig, 'TENANT');
         const tenantDatabaseId = tenantConfig.firestoreDatabaseId;
