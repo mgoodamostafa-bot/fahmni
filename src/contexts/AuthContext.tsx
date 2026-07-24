@@ -149,6 +149,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setProfileHanging(true);
     }, 12000);
 
+    const isSqlEngine = (window as any).VITE_DB_TYPE === 'sqlite' || import.meta.env.VITE_DB_TYPE === 'sqlite';
+    if (isSqlEngine) {
+      const savedUserStr = localStorage.getItem('fahmni_sqlite_user');
+      if (savedUserStr) {
+        try {
+          const savedUser = JSON.parse(savedUserStr);
+          setUser({ uid: savedUser.uid, email: savedUser.email, displayName: savedUser.displayName } as any);
+          setProfile(savedUser);
+        } catch (e) {}
+      }
+      setLoading(false);
+      clearTimeout(forceUnfreeze);
+      return;
+    }
+
     const currentAuth = getTenantAuth();
     if (!currentAuth) {
       addLog("❌ Error: currentAuth is undefined! Firebase initialization delayed or failed.");

@@ -1470,6 +1470,95 @@ VITE_TENANT_DATA='${JSON.stringify(fullTenantObj)}'
     }
   });
 
+  // Local SQLite Auth Endpoint - Register
+  app.post('/api/auth/register', async (req, res) => {
+    try {
+      const { email, password, displayName, studentPhone, motherPhone, fatherPhone, schoolName, grade, level } = req.body;
+      if (!email || !password || !displayName) {
+        return res.status(400).json({ error: 'الرجاء ملء جميع البيانات المطلوبة' });
+      }
+
+      await ensureBackupDir();
+      const localDbPath = path.join(BACKUP_DIR, 'local_database.json');
+      let localDb: any = { users: [], courses: [], lessons: [], exams: [] };
+      try {
+        const fileContent = await fs.readFile(localDbPath, 'utf-8');
+        localDb = JSON.parse(fileContent);
+      } catch (e) {
+        localDb = { users: [], courses: [], lessons: [], exams: [] };
+      }
+
+      if (!localDb.users) localDb.users = [];
+
+      // Check if user already exists
+      const existing = localDb.users.find((u: any) => u.email?.toLowerCase() === email.toLowerCase());
+      if (existing) {
+        return res.status(400).json({ error: 'هذا البريد الإلكتروني مُسجل بالفعل' });
+      }
+
+      const isFirstUser = localDb.users.length === 0;
+      const role = isFirstUser ? 'admin' : 'student';
+      const uid = `user_sqlite_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+      const studentId = `12610${localDb.users.length + 8}`;
+
+      const newUser = {
+        uid,
+        email,
+        password, // stored locally for self-hosted sqlite
+        displayName,
+        name: displayName,
+        role,
+        isOwner: isFirstUser,
+        studentPhone,
+        motherPhone,
+        fatherPhone,
+        schoolName,
+        grade,
+        level: level || 'secondary',
+        studentId,
+        walletBalance: 0,
+        enrolledCourses: [],
+        createdAt: new Date().toISOString()
+      };
+
+      localDb.users.push(newUser);
+      await fs.writeFile(localDbPath, JSON.stringify(localDb, null, 2), 'utf-8');
+
+      res.json({ success: true, user: newUser, isFirstUser });
+    } catch (err: any) {
+      console.error('Error in SQLite register:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Local SQLite Auth Endpoint - Login
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ error: 'الرجاء إدخال البريد الإلكتروني وكلمة السر' });
+      }
+
+      const localDbPath = path.join(BACKUP_DIR, 'local_database.json');
+      let localDb: any = { users: [] };
+      try {
+        const fileContent = await fs.readFile(localDbPath, 'utf-8');
+        localDb = JSON.parse(fileContent);
+      } catch (e) {
+        return res.status(404).json({ error: 'لم يتم العثور على أي حساب مسجل' });
+      }
+
+      const user = (localDb.users || []).find((u: any) => u.email?.toLowerCase() === email.toLowerCase() && u.password === password);
+      if (!user) {
+        return res.status(401).json({ error: 'البريد الإلكتروني أو كلمة السر غير صحيحة' });
+      }
+
+      res.json({ success: true, user });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // API Endpoint - Export Single Tenant Complete JSON Backup
   app.all('/api/tenants/:tenantId/export-backup', async (req, res) => {
     try {

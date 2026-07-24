@@ -93,6 +93,27 @@ export const Login: React.FC = () => {
     setError('');
     setIsGhostAccount(false);
     try {
+      const isSqlEngine = (window as any).VITE_DB_TYPE === 'sqlite' || import.meta.env.VITE_DB_TYPE === 'sqlite';
+      if (isSqlEngine) {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'فشل تسجيل الدخول');
+        
+        localStorage.setItem('fahmni_sqlite_user', JSON.stringify(data.user));
+        alert('🎉 تم تسجيل الدخول بنجاح!');
+        if (data.user.role === 'admin') {
+          navigate('/admin/dashboard', { replace: true });
+        } else {
+          navigate('/', { replace: true });
+        }
+        setLoading(false);
+        return;
+      }
+
       const userCredential = await signInWithEmailAndPassword(getTenantAuth(), email, password);
       
       // Verify that user profile exists in Firestore
