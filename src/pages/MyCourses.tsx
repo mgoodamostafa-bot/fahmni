@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, orderBy, doc, getDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, getTenantCollection, getTenantDoc } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { BookOpen, Zap, Search, ArrowRight, ChevronLeft, LayoutDashboard } from 'lucide-react';
 import { CourseCard } from '../components/CourseCard';
@@ -38,9 +38,9 @@ export const MyCourses: React.FC = () => {
       
       try {
         setLoading(true);
-        // 1. Fetch Enrollments (Double check Uppercase and lowercase)
-        const qUpper = query(collection(db, 'Enrollments'), where('userId', '==', user.uid), where('status', '==', 'active'));
-        const qLower = query(collection(db, 'enrollments'), where('userId', '==', user.uid), where('status', '==', 'active'));
+        // 1. Fetch Enrollments
+        const qUpper = query(getTenantCollection('Enrollments'), where('userId', '==', user.uid), where('status', '==', 'active'));
+        const qLower = query(getTenantCollection('enrollments'), where('userId', '==', user.uid), where('status', '==', 'active'));
         
         const [snapUpper, snapLower] = await Promise.all([getDocs(qUpper), getDocs(qLower)]);
         const courseIds = Array.from(new Set([
@@ -55,11 +55,9 @@ export const MyCourses: React.FC = () => {
         }
 
         const coursePromises = courseIds.filter(id => !!id).map(async (id) => {
-          // Primarily use Uppercase 'Courses'
-          let courseDoc = await getDoc(doc(db, 'Courses', id));
+          let courseDoc = await getDoc(getTenantDoc('Courses', id));
           if (!courseDoc.exists()) {
-            // Fallback for legacy data
-            courseDoc = await getDoc(doc(db, 'courses', id));
+            courseDoc = await getDoc(getTenantDoc('courses', id));
           }
           
           if (!courseDoc.exists()) return null;
@@ -68,7 +66,7 @@ export const MyCourses: React.FC = () => {
           
           // Fetch teacher info
           if (courseData.teacherId) {
-            const teacherDoc = await getDoc(doc(db, 'users', courseData.teacherId));
+            const teacherDoc = await getDoc(getTenantDoc('users', courseData.teacherId));
             if (teacherDoc.exists()) {
               const teacherData = teacherDoc.data();
               courseData.teacherName = teacherData.displayName || 'مدرس المنصة';

@@ -14,7 +14,7 @@ import {
 import { Navbar } from '../components/Navbar';
 import { CourseCard } from '../components/CourseCard';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
-import { getTenantDb } from '../lib/firebase';
+import { getTenantDb, getTenantCollection, getTenantDoc } from '../lib/firebase';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -22,6 +22,7 @@ export const Dashboard: React.FC = () => {
   const { user, profile } = useAuth();
   const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
   const studentName = profile?.displayName || user?.displayName || 'طالبنا المتميز';
 
   useEffect(() => {
@@ -29,7 +30,7 @@ export const Dashboard: React.FC = () => {
       if (!user) return;
       try {
         const enrollmentsQ = query(
-          collection(getTenantDb(), 'Enrollments'),
+          getTenantCollection('Enrollments'),
           where('studentId', '==', user.uid),
           where('status', '==', 'active')
         );
@@ -38,7 +39,7 @@ export const Dashboard: React.FC = () => {
         const coursesData = await Promise.all(
           enrollmentsSnap.docs.map(async (enrollmentDoc) => {
             const courseId = enrollmentDoc.data().courseId;
-            const courseDoc = await getDoc(doc(getTenantDb(), 'Courses', courseId));
+            const courseDoc = await getDoc(getTenantDoc('Courses', courseId));
             if (courseDoc.exists()) {
               return { id: courseDoc.id, ...courseDoc.data() };
             }

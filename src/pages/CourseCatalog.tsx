@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Search, BookOpen } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { collection, onSnapshot, query, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, getTenantCollection } from '../lib/firebase';
 import { CourseCard } from '../components/CourseCard';
 import { useAuth } from '../contexts/AuthContext';
 import { CourseCardSkeleton } from '../components/Skeleton';
@@ -88,12 +88,12 @@ export const CourseCatalog: React.FC = () => {
       setLoading(false);
     };
 
-    const unsubUpper = onSnapshot(query(collection(db, 'Courses')), (snap) => {
+    const unsubUpper = onSnapshot(query(getTenantCollection('Courses')), (snap) => {
       upperCourses = processDocs(snap);
       combineAndFilter();
     });
 
-    const unsubLower = onSnapshot(query(collection(db, 'courses')), (snap) => {
+    const unsubLower = onSnapshot(query(getTenantCollection('courses')), (snap) => {
       lowerCourses = processDocs(snap);
       combineAndFilter();
     });

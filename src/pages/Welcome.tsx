@@ -11,7 +11,7 @@ import {
   Globe,
 } from 'lucide-react';
 import { collection, getDocs, query, limit } from 'firebase/firestore';
-import { getTenantDb, db as firebaseDb, masterDb } from '../lib/firebase';
+import { getTenantDb, db as firebaseDb, masterDb, getTenantCollection } from '../lib/firebase';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useTenant } from '../contexts/TenantContext';
@@ -44,11 +44,11 @@ export const Welcome: React.FC = () => {
   const teacherPhoto = tenantData?.teacherPhoto || settings.teacherPhotoUrl || '';
   const subject = tenantData?.subject || settings.subject || 'الفيزياء';
 
-  // Fetch courses from a specific db instance
-  const fetchFromDb = async (database: any): Promise<any[]> => {
+  // Fetch courses from tenant scoped db collection
+  const fetchFromDb = async (_database: any): Promise<any[]> => {
     const [snapUpper, snapLower] = await Promise.all([
-      getDocs(query(collection(database, 'Courses'), limit(100))),
-      getDocs(query(collection(database, 'courses'), limit(100)))
+      getDocs(query(getTenantCollection('Courses'), limit(100))),
+      getDocs(query(getTenantCollection('courses'), limit(100)))
     ]);
     const allDocs = [...snapUpper.docs, ...snapLower.docs].map(d => ({ id: d.id, ...d.data() }));
     const uniqueMap = new Map();
