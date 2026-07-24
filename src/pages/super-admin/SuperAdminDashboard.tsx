@@ -742,14 +742,22 @@ VITE_STANDALONE_MODE=true
   };
 
   const saveTenant = async (tenantData: Partial<Tenant>) => {
-    if (!tenantData.subdomain) {
-      alert('النطاق الفرعي مطلوب لأنه يمثل معرف العميل.');
-      return;
+    let subdomain = tenantData.subdomain?.trim();
+    if (!subdomain) {
+      if (tenantData.name) {
+        subdomain = tenantData.name.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+      }
+      if (!subdomain && tenantData.customDomain) {
+        subdomain = tenantData.customDomain.split('.')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+      }
+      if (!subdomain) {
+        subdomain = `tenant-${Date.now().toString().slice(-6)}`;
+      }
     }
-    const safeSubdomain = tenantData.subdomain
+    const safeSubdomain = subdomain
       .toLowerCase()
       .trim()
-      .replace(/[^a-z0-9-]/g, '');
+      .replace(/[^a-z0-9-]/g, '') || `tenant-${Date.now().toString().slice(-6)}`;
     const dataToSave = { ...tenantData };
     delete dataToSave.id;
 
