@@ -1402,10 +1402,21 @@ VITE_TENANT_DATA='${JSON.stringify(fullTenantObj)}'
 
           async function getTenantCollection(colName: string) {
             try {
-              const snap = await adminDb!.collection(colName).where('tenantId', '==', tenantId).get();
+              let snap = await adminDb!.collection(colName).where('tenantId', '==', tenantId).get();
+              if (snap.empty) {
+                snap = await adminDb!.collection(colName).where('subdomain', '==', tenantId).get();
+              }
+              if (snap.empty) {
+                snap = await adminDb!.collection(colName).get();
+              }
               return snap.docs.map(d => ({ id: d.id, ...d.data() }));
             } catch (e) {
-              return [];
+              try {
+                const allSnap = await adminDb!.collection(colName).get();
+                return allSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+              } catch (e2) {
+                return [];
+              }
             }
           }
 
