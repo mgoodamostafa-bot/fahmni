@@ -1109,6 +1109,141 @@ async function startServer() {
     return pageTitle;
   };
 
+  // Backend Standalone Exporter API - bundles compiled dist assets + configs
+  app.get('/api/export-standalone-zip', async (req, res) => {
+    try {
+      const tenantId = (req.query.subdomain as string) || 'standalone';
+      const customDomain = (req.query.customDomain as string) || (tenantId ? `${tenantId}.fahmni.me` : '');
+      const name = (req.query.name as string) || tenantId || 'المنصة المستقلة';
+      const firebaseConfig = (req.query.firebaseConfig as string) || '';
+      const supabaseUrl = (req.query.supabaseUrl as string) || '';
+      const supabaseAnonKey = (req.query.supabaseAnonKey as string) || '';
+
+      const JSZip = (await import('jszip')).default;
+      const zip = new JSZip();
+
+      // 1. .env file
+      const envContent = `# =======================================================
+# Standalone Environment Config for Tenant: ${name}
+# Subdomain / ID: ${tenantId}
+# Custom Domain: ${customDomain}
+# Generated Date: ${new Date().toLocaleString('ar-EG')}
+# =======================================================
+
+VITE_TENANT_ID=${tenantId}
+VITE_CUSTOM_DOMAIN=${customDomain}
+VITE_FIREBASE_CONFIG='${firebaseConfig}'
+VITE_SUPABASE_URL=${supabaseUrl}
+VITE_SUPABASE_ANON_KEY=${supabaseAnonKey}
+VITE_STANDALONE_MODE=true
+`;
+      zip.file('.env', envContent);
+
+      // 2. firebase-applet-config.json
+      let jsonStr = firebaseConfig || '{}';
+      try {
+        jsonStr = JSON.stringify(JSON.parse(firebaseConfig), null, 2);
+      } catch (e) {}
+      zip.file('firebase-applet-config.json', jsonStr);
+
+      // 3. .htaccess for CPanel / Hostinger
+      const htaccessContent = `<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^index\\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>
+`;
+      zip.file('.htaccess', htaccessContent);
+
+      // 4. vercel.json for 1-Click Vercel Deployment
+      const vercelJsonContent = JSON.stringify({
+        version: 2,
+        buildCommand: "echo 'Static deployment bundle ready'",
+        outputDirectory: ".",
+        rewrites: [{ source: "/(.*)", destination: "/index.html" }]
+      }, null, 2);
+      zip.file('vercel.json', vercelJsonContent);
+
+      // 5. DEPLOYMENT_GUIDE.md
+      zip.file('DEPLOYMENT_GUIDE.md', `# 🚀 دليل استضافة المنصة المستقلة للمعلم: ${name}
+تاريخ الإصدار: ${new Date().toLocaleDateString('ar-EG')}
+الدومين المستهدف: ${customDomain}
+
+## 1. الرفع السريع على Vercel / Netlify
+1. قم بفك الضغط عن هذا المجلد.
+2. اسحب المجلد إلى Vercel أو Netlify Drop (app.netlify.com/drop).
+3. اضغط Deploy وستعمل المنصة فوراً بدون أي أخطاء!
+
+## 2. الرفع على Hostinger أو CPanel
+1. افتح لوحة التحكم في Hostinger أو CPanel.
+2. ارفع كافة الملفات الموجودة داخل مجلد dist_ready_for_public_html إلى مجلد public_html.
+3. ستعمل المنصة ودومينك الخاص فوراً!
+`);
+
+      // 6. Read actual compiled dist directory files if available
+      const distPath = path.join(process.cwd(), 'dist');
+      let hasDist = false;
+      try {
+        const stats = await fs.stat(distPath);
+        if (stats.isDirectory()) {
+          hasDist = true;
+        }
+      } catch (e) {}
+
+      async function addFolderToZip(zipObj: any, folderPath: string, zipRelativePath: string) {
+        const entries = await fs.readdir(folderPath, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = path.join(folderPath, entry.name);
+          const relPath = zipRelativePath ? `${zipRelativePath}/${entry.name}` : entry.name;
+          if (entry.isDirectory()) {
+            await addFolderToZip(zipObj, fullPath, relPath);
+          } else {
+            let fileData = await fs.readFile(fullPath);
+            if (entry.name === 'index.html') {
+              let htmlStr = fileData.toString('utf-8');
+              const injectScript = `<script>
+  window.VITE_TENANT_ID = "${tenantId}";
+  window.VITE_CUSTOM_DOMAIN = "${customDomain}";
+  window.VITE_FIREBASE_CONFIG = '${firebaseConfig}';
+  window.VITE_SUPABASE_URL = "${supabaseUrl}";
+  window.VITE_SUPABASE_ANON_KEY = "${supabaseAnonKey}";
+  window.VITE_STANDALONE_MODE = "true";
+</script>`;
+              htmlStr = htmlStr.replace('<head>', `<head>\n  ${injectScript}`);
+              htmlStr = htmlStr.replace(/<title>.*?<\/title>/, `<title>منصة فهماني التعليمية - ${name}</title>`);
+              zipObj.file(relPath, htmlStr);
+            } else {
+              zipObj.file(relPath, fileData);
+            }
+          }
+        }
+      }
+
+      if (hasDist) {
+        await addFolderToZip(zip, distPath, '');
+        const distFolder = zip.folder('dist_ready_for_public_html');
+        if (distFolder) {
+          await addFolderToZip(distFolder, distPath, '');
+          distFolder.file('.htaccess', htaccessContent);
+          distFolder.file('.env', envContent);
+          distFolder.file('firebase-applet-config.json', jsonStr);
+          distFolder.file('vercel.json', vercelJsonContent);
+        }
+      }
+
+      const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="fahmni_standalone_${tenantId}_full_bundle.zip"`);
+      res.send(zipBuffer);
+    } catch (err: any) {
+      console.error('Error generating standalone zip:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
