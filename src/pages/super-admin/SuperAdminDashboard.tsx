@@ -138,16 +138,13 @@ export const SuperAdminDashboard = () => {
   const downloadCompleteZipBundle = async (tenant: Tenant) => {
     setGeneratingZip(true);
     try {
-      const params = new URLSearchParams({
-        subdomain: tenant.subdomain || '',
-        customDomain: tenant.customDomain || '',
-        name: tenant.name || '',
-        firebaseConfig: tenant.firebaseConfig || '',
-        supabaseUrl: tenant.supabaseUrl || '',
-        supabaseAnonKey: tenant.supabaseAnonKey || ''
+      const res = await fetch('/api/export-standalone-zip', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(tenant)
       });
-
-      const res = await fetch(`/api/export-standalone-zip?${params.toString()}`);
       if (!res.ok) {
         throw new Error(`فشل استخراج ملفات المنصة (${res.statusText})`);
       }

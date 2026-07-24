@@ -1110,49 +1110,62 @@ async function startServer() {
   };
 
   // Backend Standalone Exporter API - bundles compiled dist assets + configs + full tenant branding
-  app.get('/api/export-standalone-zip', async (req, res) => {
+  app.all('/api/export-standalone-zip', async (req, res) => {
     try {
-      const tenantId = (req.query.subdomain as string) || 'standalone';
-      const customDomain = (req.query.customDomain as string) || (tenantId ? `${tenantId}.fahmni.me` : '');
-      const name = (req.query.name as string) || tenantId || 'المنصة المستقلة';
-      const firebaseConfig = (req.query.firebaseConfig as string) || '';
-      const supabaseUrl = (req.query.supabaseUrl as string) || '';
-      const supabaseAnonKey = (req.query.supabaseAnonKey as string) || '';
+      const bodyData = req.body || {};
+      const queryData = req.query || {};
+      const payload = { ...queryData, ...bodyData };
+
+      const tenantId = (payload.subdomain as string) || (payload.tenant?.subdomain as string) || 'standalone';
+      const customDomain = (payload.customDomain as string) || (payload.tenant?.customDomain as string) || (tenantId ? `${tenantId}.fahmni.me` : '');
+      const name = (payload.name as string) || (payload.tenant?.name as string) || tenantId || 'المنصة المستقلة';
+      const firebaseConfig = (payload.firebaseConfig as string) || (payload.tenant?.firebaseConfig as string) || '';
+      const supabaseUrl = (payload.supabaseUrl as string) || (payload.tenant?.supabaseUrl as string) || '';
+      const supabaseAnonKey = (payload.supabaseAnonKey as string) || (payload.tenant?.supabaseAnonKey as string) || '';
 
       // Fetch full tenant document from Firestore to bundle branding, logo, colors, and content
-      let tenantDocData: any = null;
+      let tenantDocData: any = {};
       try {
         const adminDb = getAdminDb();
-        if (adminDb) {
+        if (adminDb && tenantId) {
           const tDoc = await adminDb.collection('tenants').doc(tenantId).get();
           if (tDoc.exists) {
-            tenantDocData = tDoc.data();
+            tenantDocData = tDoc.data() || {};
           }
         }
       } catch (e) {
         console.error('Error fetching tenant doc in exporter API:', e);
       }
 
+      const tenantObj = payload.tenant || payload || {};
+
       const fullTenantObj = {
         name,
-        siteName: tenantDocData?.siteName || name,
-        teacherName: tenantDocData?.teacherName || tenantDocData?.name || name,
-        teacherTitle: tenantDocData?.teacherTitle || '',
-        subject: tenantDocData?.subject || '',
-        logo: tenantDocData?.logo || tenantDocData?.logoUrl || '',
-        logoUrl: tenantDocData?.logoUrl || tenantDocData?.logo || '',
-        fruitTheme: tenantDocData?.fruitTheme || 'blue',
-        primaryColor: tenantDocData?.primaryColor || '',
-        welcomeTitle: tenantDocData?.welcomeTitle || '',
-        welcomeSubtitle: tenantDocData?.welcomeSubtitle || '',
-        heroBanner: tenantDocData?.heroBanner || '',
-        facebook: tenantDocData?.facebook || '',
-        youtube: tenantDocData?.youtube || '',
-        telegram: tenantDocData?.telegram || '',
-        whatsapp: tenantDocData?.whatsapp || '',
-        instagram: tenantDocData?.instagram || '',
-        tiktok: tenantDocData?.tiktok || '',
-        ...(tenantDocData || {}),
+        siteName: tenantObj.siteName || tenantObj.name || tenantDocData.siteName || tenantDocData.name || name,
+        teacherName: tenantObj.teacherName || tenantObj.name || tenantDocData.teacherName || tenantDocData.name || name,
+        teacherTitle: tenantObj.teacherTitle || tenantDocData.teacherTitle || '',
+        subject: tenantObj.subject || tenantDocData.subject || '',
+        logo: tenantObj.logo || tenantObj.logoUrl || tenantDocData.logo || tenantDocData.logoUrl || '',
+        logoUrl: tenantObj.logoUrl || tenantObj.logo || tenantDocData.logoUrl || tenantDocData.logo || '',
+        fruitTheme: tenantObj.fruitTheme || tenantDocData.fruitTheme || 'emerald',
+        primaryColor: tenantObj.primaryColor || tenantDocData.primaryColor || '',
+        welcomeTitle: tenantObj.welcomeTitle || tenantDocData.welcomeTitle || '',
+        welcomeSubtitle: tenantObj.welcomeSubtitle || tenantDocData.welcomeSubtitle || '',
+        heroBanner: tenantObj.heroBanner || tenantDocData.heroBanner || '',
+        heroTitle1: tenantObj.heroTitle1 || tenantDocData.heroTitle1 || '',
+        heroTitle2: tenantObj.heroTitle2 || tenantDocData.heroTitle2 || '',
+        heroTitle3: tenantObj.heroTitle3 || tenantDocData.heroTitle3 || '',
+        heroDescription: tenantObj.heroDescription || tenantDocData.heroDescription || '',
+        teacherPhoto: tenantObj.teacherPhoto || tenantObj.teacherPhotoUrl || tenantDocData.teacherPhoto || tenantDocData.teacherPhotoUrl || '',
+        teacherPhotoUrl: tenantObj.teacherPhotoUrl || tenantObj.teacherPhoto || tenantDocData.teacherPhotoUrl || tenantDocData.teacherPhoto || '',
+        facebook: tenantObj.facebook || tenantDocData.facebook || '',
+        youtube: tenantObj.youtube || tenantDocData.youtube || '',
+        telegram: tenantObj.telegram || tenantDocData.telegram || '',
+        whatsapp: tenantObj.whatsapp || tenantDocData.whatsapp || '',
+        instagram: tenantObj.instagram || tenantDocData.instagram || '',
+        tiktok: tenantObj.tiktok || tenantDocData.tiktok || '',
+        ...tenantDocData,
+        ...tenantObj,
         subdomain: tenantId,
         customDomain,
         firebaseConfig,
