@@ -125,14 +125,16 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const envTenantId = (window as any).VITE_TENANT_ID || import.meta.env.VITE_TENANT_ID;
     const isStandalone = (window as any).VITE_STANDALONE_MODE === 'true' || import.meta.env.VITE_STANDALONE_MODE === 'true' || (envTenantId && envTenantId !== 'main');
 
+    const envTenantData = (window as any).VITE_TENANT_DATA;
     if (isStandalone && envTenantId) {
       console.log('🚀 TenantContext: Standalone Mode Active for Tenant:', envTenantId);
-      const standaloneData = {
+      let standaloneData = {
         subdomain: envTenantId,
         customDomain: (window as any).VITE_CUSTOM_DOMAIN || import.meta.env.VITE_CUSTOM_DOMAIN || hostname,
         firebaseConfig: (window as any).VITE_FIREBASE_CONFIG || import.meta.env.VITE_FIREBASE_CONFIG || '',
         supabaseUrl: (window as any).VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL || '',
-        supabaseAnonKey: (window as any).VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+        supabaseAnonKey: (window as any).VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+        ...(typeof envTenantData === 'object' ? envTenantData : {})
       };
 
       setTenantId(envTenantId);

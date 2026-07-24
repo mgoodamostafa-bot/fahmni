@@ -1109,7 +1109,7 @@ async function startServer() {
     return pageTitle;
   };
 
-  // Backend Standalone Exporter API - bundles compiled dist assets + configs
+  // Backend Standalone Exporter API - bundles compiled dist assets + configs + full tenant branding
   app.get('/api/export-standalone-zip', async (req, res) => {
     try {
       const tenantId = (req.query.subdomain as string) || 'standalone';
@@ -1118,6 +1118,47 @@ async function startServer() {
       const firebaseConfig = (req.query.firebaseConfig as string) || '';
       const supabaseUrl = (req.query.supabaseUrl as string) || '';
       const supabaseAnonKey = (req.query.supabaseAnonKey as string) || '';
+
+      // Fetch full tenant document from Firestore to bundle branding, logo, colors, and content
+      let tenantDocData: any = null;
+      try {
+        const adminDb = getAdminDb();
+        if (adminDb) {
+          const tDoc = await adminDb.collection('tenants').doc(tenantId).get();
+          if (tDoc.exists) {
+            tenantDocData = tDoc.data();
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching tenant doc in exporter API:', e);
+      }
+
+      const fullTenantObj = {
+        name,
+        siteName: tenantDocData?.siteName || name,
+        teacherName: tenantDocData?.teacherName || tenantDocData?.name || name,
+        teacherTitle: tenantDocData?.teacherTitle || '',
+        subject: tenantDocData?.subject || '',
+        logo: tenantDocData?.logo || tenantDocData?.logoUrl || '',
+        logoUrl: tenantDocData?.logoUrl || tenantDocData?.logo || '',
+        fruitTheme: tenantDocData?.fruitTheme || 'blue',
+        primaryColor: tenantDocData?.primaryColor || '',
+        welcomeTitle: tenantDocData?.welcomeTitle || '',
+        welcomeSubtitle: tenantDocData?.welcomeSubtitle || '',
+        heroBanner: tenantDocData?.heroBanner || '',
+        facebook: tenantDocData?.facebook || '',
+        youtube: tenantDocData?.youtube || '',
+        telegram: tenantDocData?.telegram || '',
+        whatsapp: tenantDocData?.whatsapp || '',
+        instagram: tenantDocData?.instagram || '',
+        tiktok: tenantDocData?.tiktok || '',
+        ...(tenantDocData || {}),
+        subdomain: tenantId,
+        customDomain,
+        firebaseConfig,
+        supabaseUrl,
+        supabaseAnonKey,
+      };
 
       const JSZip = (await import('jszip')).default;
       const zip = new JSZip();
@@ -1136,6 +1177,7 @@ VITE_FIREBASE_CONFIG='${firebaseConfig}'
 VITE_SUPABASE_URL=${supabaseUrl}
 VITE_SUPABASE_ANON_KEY=${supabaseAnonKey}
 VITE_STANDALONE_MODE=true
+VITE_TENANT_DATA='${JSON.stringify(fullTenantObj)}'
 `;
       zip.file('.env', envContent);
 
@@ -1211,6 +1253,7 @@ VITE_STANDALONE_MODE=true
   window.VITE_SUPABASE_URL = "${supabaseUrl}";
   window.VITE_SUPABASE_ANON_KEY = "${supabaseAnonKey}";
   window.VITE_STANDALONE_MODE = "true";
+  window.VITE_TENANT_DATA = ${JSON.stringify(fullTenantObj)};
 </script>`;
               htmlStr = htmlStr.replace('<head>', `<head>\n  ${injectScript}`);
               htmlStr = htmlStr.replace(/<title>.*?<\/title>/, `<title>منصة فهماني التعليمية - ${name}</title>`);

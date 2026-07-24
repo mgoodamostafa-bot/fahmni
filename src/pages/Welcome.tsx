@@ -275,7 +275,7 @@ export const Welcome: React.FC = () => {
             </div>
             <div className="flex flex-col text-right">
               <span className="text-sm sm:text-base font-black tracking-tight text-white uppercase">
-                {tenantData?.teacherName || 'AHMED ABD-ELMONEM'}
+                {tenantData?.teacherName || tenantData?.name || 'AHMED ABD-ELMONEM'}
               </span>
               <span className="text-[10px] text-brand-500 font-extrabold tracking-widest leading-none uppercase">
                 {tenantData?.subject || 'PHYSICS TEACHER'}
@@ -569,7 +569,7 @@ export const Welcome: React.FC = () => {
                   )}
                 </div>
                 <div className="flex flex-col text-right">
-                  <span className="text-base font-black text-white">{tenantData?.teacherName || 'أحمد عبد المنعم'}</span>
+                  <span className="text-base font-black text-white">{tenantData?.teacherName || tenantData?.name || 'أحمد عبد المنعم'}</span>
                   <span className="text-[9px] text-brand-500 font-extrabold tracking-wider leading-none uppercase">{tenantData?.subject || 'PHYSICS TEACHER'}</span>
                 </div>
               </div>
