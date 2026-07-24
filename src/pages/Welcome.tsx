@@ -69,13 +69,15 @@ export const Welcome: React.FC = () => {
         return;
       }
 
-      let list = await fetchFromDb(currentDb);
-      console.log(`[Welcome] Fetched ${list.length} courses from tenant db`);
+      const isStandalone = (window as any).VITE_STANDALONE_MODE === 'true' || import.meta.env.VITE_STANDALONE_MODE === 'true' || tenantData?.isStandalone;
 
-      // If tenant db returned 0 and it's first attempt, retry after 1.5s
-      // (tenant db might not be initialized yet)
-      if (list.length === 0 && retryCount === 0) {
-        setTimeout(() => fetchCourses(1), 1500);
+      let list = await fetchFromDb(currentDb);
+      console.log(`[Welcome] Fetched ${list.length} courses from tenant db (isStandalone: ${isStandalone})`);
+
+      if (isStandalone) {
+        // Standalone platform - strictly show only its own courses, never fall back to masterDb demo courses
+        setCourses(list.slice(0, 8));
+        setCoursesLoading(false);
         return;
       }
 
