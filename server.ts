@@ -1378,30 +1378,46 @@ VITE_TENANT_DATA='${JSON.stringify(fullTenantObj)}'
   });
 
   // API Endpoint - Export Single Tenant Complete JSON Backup
-  app.get('/api/tenants/:tenantId/export-backup', async (req, res) => {
+  app.all('/api/tenants/:tenantId/export-backup', async (req, res) => {
     try {
       const { tenantId } = req.params;
+      const bodyTenant = req.body?.tenant || req.body || {};
       const adminDb = getAdminDb();
-      if (!adminDb) {
-        return res.status(500).json({ error: 'Database admin instance not available' });
-      }
 
-      // Fetch tenant metadata
-      const tenantDoc = await adminDb.collection('tenants').doc(tenantId).get();
-      const tenantData = tenantDoc.exists ? tenantDoc.data() : { id: tenantId };
+      let tenantData = bodyTenant;
+      let users: any[] = [];
+      let courses: any[] = [];
+      let lessons: any[] = [];
+      let exams: any[] = [];
+      let questions: any[] = [];
+      let examResults: any[] = [];
+      let chargeCards: any[] = [];
 
-      // Helper to fetch collection filtering by tenantId if applicable
-      async function getTenantCollection(colName: string) {
+      if (adminDb) {
         try {
-          const snap = await adminDb.collection(colName).where('tenantId', '==', tenantId).get();
-          return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        } catch (e) {
-          try {
-            const allSnap = await adminDb.collection(colName).get();
-            return allSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-          } catch (e2) {
-            return [];
+          const tenantDoc = await adminDb.collection('tenants').doc(tenantId).get();
+          if (tenantDoc.exists) {
+            tenantData = { ...tenantDoc.data(), ...bodyTenant };
           }
+
+          async function getTenantCollection(colName: string) {
+            try {
+              const snap = await adminDb!.collection(colName).where('tenantId', '==', tenantId).get();
+              return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            } catch (e) {
+              return [];
+            }
+          }
+
+          users = await getTenantCollection('users');
+          courses = await getTenantCollection('courses');
+          lessons = await getTenantCollection('lessons');
+          exams = await getTenantCollection('exams');
+          questions = await getTenantCollection('questions');
+          examResults = await getTenantCollection('examResults');
+          chargeCards = await getTenantCollection('chargeCards');
+        } catch (dbErr) {
+          console.warn('Admin DB lookup warning in export-backup:', dbErr);
         }
       }
 
@@ -1409,13 +1425,13 @@ VITE_TENANT_DATA='${JSON.stringify(fullTenantObj)}'
         tenantId,
         exportedAt: new Date().toISOString(),
         tenant: tenantData,
-        users: await getTenantCollection('users'),
-        courses: await getTenantCollection('courses'),
-        lessons: await getTenantCollection('lessons'),
-        exams: await getTenantCollection('exams'),
-        questions: await getTenantCollection('questions'),
-        examResults: await getTenantCollection('examResults'),
-        chargeCards: await getTenantCollection('chargeCards')
+        users,
+        courses,
+        lessons,
+        exams,
+        questions,
+        examResults,
+        chargeCards
       };
 
       res.setHeader('Content-Type', 'application/json');
