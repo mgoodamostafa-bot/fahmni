@@ -1559,6 +1559,83 @@ VITE_TENANT_DATA='${JSON.stringify(fullTenantObj)}'
     }
   });
 
+  // Generic SQLite / Local JSON Database REST API Endpoints
+  app.get('/api/local-db/:collection', async (req, res) => {
+    try {
+      const { collection } = req.params;
+      await ensureBackupDir();
+      const localDbPath = path.join(BACKUP_DIR, 'local_database.json');
+      let localDb: any = {};
+      try {
+        const fileContent = await fs.readFile(localDbPath, 'utf-8');
+        localDb = JSON.parse(fileContent);
+      } catch (e) {
+        localDb = {};
+      }
+      res.json({ items: localDb[collection] || [] });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/local-db/:collection', async (req, res) => {
+    try {
+      const { collection } = req.params;
+      const { item } = req.body;
+      if (!item) return res.status(400).json({ error: 'Missing item data' });
+
+      await ensureBackupDir();
+      const localDbPath = path.join(BACKUP_DIR, 'local_database.json');
+      let localDb: any = {};
+      try {
+        const fileContent = await fs.readFile(localDbPath, 'utf-8');
+        localDb = JSON.parse(fileContent);
+      } catch (e) {
+        localDb = {};
+      }
+
+      if (!localDb[collection]) localDb[collection] = [];
+      const itemId = item.id || item.uid || `local_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+      const cleanItem = { ...item, id: itemId };
+
+      const idx = localDb[collection].findIndex((i: any) => (i.id && i.id === itemId) || (i.uid && i.uid === itemId));
+      if (idx >= 0) {
+        localDb[collection][idx] = { ...localDb[collection][idx], ...cleanItem };
+      } else {
+        localDb[collection].push(cleanItem);
+      }
+
+      await fs.writeFile(localDbPath, JSON.stringify(localDb, null, 2), 'utf-8');
+      res.json({ success: true, item: cleanItem });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete('/api/local-db/:collection/:id', async (req, res) => {
+    try {
+      const { collection, id } = req.params;
+      await ensureBackupDir();
+      const localDbPath = path.join(BACKUP_DIR, 'local_database.json');
+      let localDb: any = {};
+      try {
+        const fileContent = await fs.readFile(localDbPath, 'utf-8');
+        localDb = JSON.parse(fileContent);
+      } catch (e) {
+        localDb = {};
+      }
+
+      if (localDb[collection]) {
+        localDb[collection] = localDb[collection].filter((i: any) => i.id !== id && i.uid !== id);
+        await fs.writeFile(localDbPath, JSON.stringify(localDb, null, 2), 'utf-8');
+      }
+
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // API Endpoint - Export Single Tenant Complete JSON Backup
   app.all('/api/tenants/:tenantId/export-backup', async (req, res) => {
     try {
