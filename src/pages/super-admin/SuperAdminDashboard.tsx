@@ -58,6 +58,7 @@ interface Tenant {
   primaryColor?: string;
   fruitTheme?: string;
   platformMode?: 'single' | 'academy';
+  dbEngine?: 'firebase' | 'sqlite' | 'mysql' | 'postgres' | string;
   educationStage?: string;
   showSuggestedCourses?: boolean;
   teacherName?: string;
@@ -237,6 +238,27 @@ export const SuperAdminDashboard = () => {
       a.click();
       URL.revokeObjectURL(url);
       alert(`🎉 تم تنزيل النسخة الاحتياطية لمنصة (${tenant.name}) بنجاح!`);
+    }
+  };
+
+  const downloadSelfHostedSqliteZip = async (tenant: Tenant) => {
+    try {
+      const res = await fetch('/api/export-standalone-zip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...tenant, dbEngine: 'sqlite', isStandalone: true })
+      });
+      if (!res.ok) throw new Error('فشل توليد حزمة سيرفر SQLite الذاتية');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `fahmni_selfhosted_${tenant.subdomain || 'standalone'}_sqlite_bundle.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      alert(`🎉 تم إنشاء وتنزيل حزمة سيرفر SQLite الذاتية المكتملة لمنصة (${tenant.name}) بنجاح! جاهزة للرفع على Hostinger Node.js app أو VPS.`);
+    } catch (err: any) {
+      alert('خطأ في استخراج حزمة السيرفر الذاتية: ' + err.message);
     }
   };
 
@@ -1479,6 +1501,49 @@ VITE_STANDALONE_MODE=true
                           }`}
                         >
                           أكاديمية
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Database & Infrastructure Engine Selector */}
+                    <div className="space-y-2 p-4 bg-purple-500/[0.05] border border-purple-500/20 rounded-2xl space-y-3">
+                      <label className="text-sm font-black text-white flex items-center gap-2">
+                        <Database size={16} className="text-purple-400" /> البنية التحتية وقاعدة البيانات (Database & Server Engine)
+                      </label>
+                      <p className="text-[11px] text-gray-400">
+                        اختر ما إذا كانت المنصة تعمل بسحابة Firebase أو بسيرفر المعلم المستقل بـ SQLite المحلي بدون أي خدمات خارجية
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setEditingTenant({ ...editingTenant, dbEngine: 'firebase', isStandalone: false })}
+                          className={`p-3.5 rounded-xl border text-right transition-all flex flex-col justify-between ${
+                            !editingTenant.dbEngine || editingTenant.dbEngine === 'firebase'
+                              ? 'bg-brand-blue/20 border-brand-blue text-white shadow-lg'
+                              : 'bg-black/30 border-white/10 text-gray-400 hover:border-white/20'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="font-bold text-xs">🔵 سحابي بـ Firebase</span>
+                            <span className="text-[10px] bg-brand-blue/20 text-brand-blue px-2 py-0.5 rounded-md font-bold">Cloud NoSQL</span>
+                          </div>
+                          <p className="text-[10px] text-gray-400">ربط سحابي سريع بـ Google Firebase.</p>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setEditingTenant({ ...editingTenant, dbEngine: 'sqlite', isStandalone: true })}
+                          className={`p-3.5 rounded-xl border text-right transition-all flex flex-col justify-between ${
+                            editingTenant.dbEngine === 'sqlite'
+                              ? 'bg-emerald-500/20 border-emerald-500 text-white shadow-lg'
+                              : 'bg-black/30 border-white/10 text-gray-400 hover:border-white/20'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="font-bold text-xs">🟢 ذاتي شامل (Server + SQLite)</span>
+                            <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-md font-bold">Self-Hosted</span>
+                          </div>
+                          <p className="text-[10px] text-gray-400">تشغيل وقاعدة بيانات محلي بالكامل على سيرفر المعلم بدون أي داتا بيس خارجية.</p>
                         </button>
                       </div>
                     </div>
@@ -2871,6 +2936,24 @@ VITE_STANDALONE_MODE=true
                         }}
                       />
                     </label>
+                  </div>
+
+                  {/* Option 8: Self-Hosted Node.js + SQLite Server Bundle (.ZIP) */}
+                  <div className="p-4 bg-gradient-to-r from-emerald-600/20 via-teal-600/20 to-emerald-500/20 border border-emerald-500/40 rounded-2xl space-y-2.5 hover:border-emerald-400 transition-all group col-span-1 sm:col-span-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-white flex items-center gap-1.5">
+                        <Server size={15} className="text-emerald-400" /> تصدير حزمة سيرفر شاملة بمحرك SQLite المحلي (.ZIP)
+                      </span>
+                      <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-md font-bold">Node.js + SQLite Engine</span>
+                    </div>
+                    <p className="text-[11px] text-gray-300">حزمة مخصصة للمدرسين الراغبين في تشغيل الموقع وقاعدة البيانات بالكامل على سيرفرهم الخاص (Hostinger / cPanel / VPS) دون الحاجة لفايربيس أو أي داتا بيس خارجية.</p>
+                    <button
+                      type="button"
+                      onClick={() => downloadSelfHostedSqliteZip(exporterTenant)}
+                      className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/20"
+                    >
+                      <Download size={15} /> 📦 تنزيل حزمة السيرفر الشاملة المحسنة (SQLite DB Bundle)
+                    </button>
                   </div>
                 </div>
 
