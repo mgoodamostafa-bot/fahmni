@@ -1,6 +1,6 @@
 import { initializeApp, getApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
-import { initializeFirestore, getFirestore, Firestore } from 'firebase/firestore';
+import { initializeFirestore, getFirestore, Firestore, collection, doc } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import jsonConfig from '../../firebase-applet-config.json';
 
@@ -114,4 +114,49 @@ export const initTenantApp = (tenantConfig?: any) => {
   } catch (error) {
     console.error('Error initializing tenant app', error);
   }
+};
+
+export const getCurrentTenantId = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  const w = window as any;
+  if (w.VITE_TENANT_ID && w.VITE_TENANT_ID !== 'master') return w.VITE_TENANT_ID;
+  if (w.VITE_TENANT_DATA?.subdomain && w.VITE_TENANT_DATA.subdomain !== 'master') return w.VITE_TENANT_DATA.subdomain;
+
+  const host = window.location.hostname;
+  if (host === 'localhost' || host === '127.0.0.1' || host.includes('fahmni.me')) {
+    const parts = host.split('.');
+    if (parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'admin') {
+      return parts[0];
+    }
+    return null;
+  }
+
+  if (host.includes('vercel.app') || host.includes('netlify.app') || (host.includes('.') && !host.includes('fahmni.me'))) {
+    const part = host.split('.')[0];
+    return part || 'standalone_app';
+  }
+
+  return null;
+};
+
+export const getTenantCollection = (colName: string) => {
+  const tenantId = getCurrentTenantId();
+  const currentDb = getTenantDb() || masterDb;
+  const globalCollections = ['tenants', 'super_admin', 'system', 'system_releases'];
+
+  if (tenantId && currentDb === masterDb && !globalCollections.includes(colName)) {
+    return collection(masterDb, 'tenants_data', tenantId, colName);
+  }
+  return collection(currentDb, colName);
+};
+
+export const getTenantDoc = (colName: string, docId: string) => {
+  const tenantId = getCurrentTenantId();
+  const currentDb = getTenantDb() || masterDb;
+  const globalCollections = ['tenants', 'super_admin', 'system', 'system_releases'];
+
+  if (tenantId && currentDb === masterDb && !globalCollections.includes(colName)) {
+    return doc(masterDb, 'tenants_data', tenantId, colName, docId);
+  }
+  return doc(currentDb, colName, docId);
 };

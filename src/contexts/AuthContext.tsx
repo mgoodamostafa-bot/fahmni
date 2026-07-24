@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
 import { User, onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
-import { getTenantAuth, getTenantDb } from '../lib/firebase';
+import { getTenantAuth, getTenantDb, getTenantDoc } from '../lib/firebase';
 import { useTenant } from './TenantContext';
 
 interface UserProfile {
@@ -97,7 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     addLog(`forceRefreshProfile starting for UID: ${user.uid}`);
     try {
-      const docRef = doc(getTenantDb(), 'users', user.uid);
+      const docRef = getTenantDoc('users', user.uid);
       const snap = await getDoc(docRef);
       if (snap.exists()) {
         const d = snap.data();
@@ -170,9 +170,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (u) {
         try {
-          const tenantDb = getTenantDb();
-          addLog(`Tenant DB resolved. Fetching users/${u.uid}...`);
-          const docRef = doc(tenantDb, 'users', u.uid);
+          addLog(`Fetching users/${u.uid}...`);
+          const docRef = getTenantDoc('users', u.uid);
           
           const s = await getDoc(docRef);
           addLog(`getDoc completed. Document exists: ${s.exists()}`);

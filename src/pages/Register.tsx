@@ -122,8 +122,9 @@ export const Register: React.FC = () => {
       let userRole = 'student';
       let isFirstUser = false;
       try {
-        const { collection, getDocs, query, limit } = await import('firebase/firestore');
-        const usersSnap = await getDocs(query(collection(getTenantDb(), 'users'), limit(1)));
+        const { getDocs, query, limit } = await import('firebase/firestore');
+        const { getTenantCollection } = await import('../lib/firebase');
+        const usersSnap = await getDocs(query(getTenantCollection('users'), limit(1)));
         if (usersSnap.empty) {
           userRole = 'admin';
           isFirstUser = true;
@@ -138,7 +139,8 @@ export const Register: React.FC = () => {
       }
 
       // Save user to Firestore with all detailed form data
-      await setDoc(doc(getTenantDb(), 'users', result.user.uid), {
+      const { getTenantDoc } = await import('../lib/firebase');
+      await setDoc(getTenantDoc('users', result.user.uid), {
         uid: result.user.uid,
         email: email.trim(),
         displayName: name.trim(),
