@@ -162,7 +162,18 @@ export const getCurrentTenantId = (): string | null => {
   if (w.VITE_TENANT_DATA?.subdomain && w.VITE_TENANT_DATA.subdomain !== 'master') return w.VITE_TENANT_DATA.subdomain;
 
   const host = window.location.hostname;
-  if (host === 'localhost' || host === '127.0.0.1' || host.includes('fahmni.me')) {
+
+  // Localhost with subdomain (e.g., eng.localhost:3000 or hossamalsalhy.localhost:3000)
+  if (host.includes('localhost')) {
+    const parts = host.split('.');
+    if (parts.length >= 2 && parts[0] !== 'localhost' && parts[0] !== '127' && parts[0] !== 'www' && parts[0] !== 'admin') {
+      return parts[0];
+    }
+    return null;
+  }
+
+  // Cloud multi-tenant domain (e.g., eng.fahmni.me)
+  if (host.includes('fahmni.me')) {
     const parts = host.split('.');
     if (parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'admin') {
       return parts[0];
