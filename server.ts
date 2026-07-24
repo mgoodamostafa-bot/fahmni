@@ -1300,6 +1300,83 @@ VITE_TENANT_DATA='${JSON.stringify(fullTenantObj)}'
       res.status(500).json({ error: err.message });
     }
   });
+  // ============================================================
+  // 🕒 12-HOUR AUTOMATED BACKUP ENGINE (CRON SCHEDULER)
+  // ============================================================
+  const BACKUP_DIR = path.join(process.cwd(), 'backups');
+
+  async function ensureBackupDir() {
+    try {
+      await fs.mkdir(BACKUP_DIR, { recursive: true });
+    } catch (e) {}
+  }
+
+  async function runAutomated12HourBackup() {
+    try {
+      await ensureBackupDir();
+      const adminDb = getAdminDb();
+      if (!adminDb) return;
+
+      console.log('⏰ Starting Automated 12-Hour System Backup Job...');
+      const tenantsSnap = await adminDb.collection('tenants').get();
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const backupSubDir = path.join(BACKUP_DIR, `system_backup_${timestamp}`);
+      await fs.mkdir(backupSubDir, { recursive: true });
+
+      const allTenantsData: any[] = [];
+      for (const doc of tenantsSnap.docs) {
+        const tenantData = doc.data();
+        allTenantsData.push({ id: doc.id, ...tenantData });
+      }
+
+      await fs.writeFile(
+        path.join(backupSubDir, 'all_tenants_backup.json'),
+        JSON.stringify(allTenantsData, null, 2),
+        'utf-8'
+      );
+
+      console.log(`✅ Automated 12-Hour Backup Completed Successfully! Saved in: ${backupSubDir}`);
+    } catch (error) {
+      console.error('Error during automated 12-hour backup job:', error);
+    }
+  }
+
+  // Schedule automated backup every 12 hours (12 * 60 * 60 * 1000 ms)
+  const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
+  setInterval(runAutomated12HourBackup, TWELVE_HOURS_MS);
+
+  // Trigger initial background backup after 1 minute of server startup
+  setTimeout(runAutomated12HourBackup, 60 * 1000);
+
+  // API Endpoint - Manual Backup Trigger
+  app.post('/api/backups/trigger-now', async (req, res) => {
+    try {
+      await runAutomated12HourBackup();
+      res.json({ success: true, message: 'تم إنشاء النسخة الاحتياطية بنجاح!' });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API Endpoint - List System Backups
+  app.get('/api/backups/list', async (req, res) => {
+    try {
+      await ensureBackupDir();
+      const entries = await fs.readdir(BACKUP_DIR, { withFileTypes: true });
+      const backups = entries
+        .filter(e => e.isDirectory() && e.name.startsWith('system_backup_'))
+        .map(e => ({
+          name: e.name,
+          createdAt: e.name.replace('system_backup_', '').replace(/-/g, ':')
+        }))
+        .sort((a, b) => b.name.localeCompare(a.name));
+
+      res.json({ backups });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Backend API - Generates SQL Schema + SQL Migration Script for MySQL / PostgreSQL
   app.all('/api/generate-tenant-sql-migration', async (req, res) => {
     try {
