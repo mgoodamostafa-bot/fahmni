@@ -167,8 +167,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           showTeacherGuide: tenantData.showTeacherGuide !== undefined ? tenantData.showTeacherGuide : prev.showTeacherGuide,
           removeTeacherPhotoBg: tenantData.removeTeacherPhotoBg !== undefined ? tenantData.removeTeacherPhotoBg : prev.removeTeacherPhotoBg,
           useFreeImageHosting: tenantData.useFreeImageHosting !== undefined ? tenantData.useFreeImageHosting : prev.useFreeImageHosting,
-          imgbbApiKey: tenantData.imgbbApiKey !== undefined ? tenantData.imgbbApiKey : prev.imgbbApiKey,
           useFreeFileHosting: tenantData.useFreeFileHosting !== undefined ? tenantData.useFreeFileHosting : prev.useFreeFileHosting,
+          heroTitle1: tenantData.heroTitle1 || prev.heroTitle1,
+          heroTitle2: tenantData.heroTitle2 || prev.heroTitle2,
+          heroTitle3: tenantData.heroTitle3 || prev.heroTitle3,
+          heroDescription: tenantData.heroDescription || prev.heroDescription,
         };
 
         // Persist to localStorage cache immediately so it stays in sync
