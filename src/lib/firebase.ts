@@ -58,11 +58,47 @@ const getOrInitializeFirestore = (appInstance: FirebaseApp, databaseId: string):
 const databaseId = firebaseConfig.firestoreDatabaseId || '(default)';
 export const masterDb = getOrInitializeFirestore(masterApp, databaseId);
 
-// 2. Tenant instances (will be populated dynamically)
+export const isMasterHost = (): boolean => {
+  if (typeof window === 'undefined') return true;
+  const host = window.location.hostname;
+  const isExplicitStandalone = (window as any).VITE_STANDALONE_MODE === 'true' || import.meta.env.VITE_STANDALONE_MODE === 'true';
+  if (isExplicitStandalone) return false;
+
+  // Master host is ONLY localhost/127.0.0.1 or fahmni.me / www.fahmni.me
+  if (host === 'localhost' || host === '127.0.0.1' || host === 'fahmni.me' || host === 'www.fahmni.me') {
+    return true;
+  }
+  return false;
+};
+
+const dummyStandaloneConfig = {
+  apiKey: 'AIzaSyStandaloneDummyKeyZeroData00000',
+  authDomain: 'standalone-isolated-platform.firebaseapp.com',
+  projectId: 'standalone-isolated-platform-local',
+  storageBucket: 'standalone-isolated-platform.appspot.com',
+  messagingSenderId: '000000000000',
+  appId: '1:000000000000:web:0000000000000000000000'
+};
+
+// 2. Tenant instances (populated dynamically and isolated by host by default)
 export let app: FirebaseApp;
 export let auth: Auth;
 export let db: Firestore;
 export let storage: FirebaseStorage;
+
+if (isMasterHost()) {
+  app = masterApp;
+  db = masterDb;
+} else {
+  if (getApps().some((a) => a.name === 'STANDALONE')) {
+    app = getApp('STANDALONE');
+  } else {
+    app = initializeApp(dummyStandaloneConfig, 'STANDALONE');
+  }
+  db = getOrInitializeFirestore(app, '(default)');
+}
+auth = getAuth(app);
+storage = getStorage(app);
 
 // Safe getters to avoid ES module live binding issues in React components
 export const getTenantDb = () => db;
@@ -75,22 +111,24 @@ export const initTenantApp = (tenantConfig?: any) => {
     const masterDbId = firebaseConfig.firestoreDatabaseId || '(default)';
     const tenantDbId = tenantConfig?.firestoreDatabaseId || '(default)';
 
-    const isStandalone = typeof window !== 'undefined' && (
+    const isMaster = isMasterHost();
+    const isStandalone = !isMaster || (typeof window !== 'undefined' && (
       (window as any).VITE_STANDALONE_MODE === 'true' || 
       import.meta.env.VITE_STANDALONE_MODE === 'true' ||
       tenantConfig?.isStandalone
-    );
+    ));
 
-    // If no config provided, or it's the exact same project AND database, reuse masterApp
+    // Only reuse masterApp if we are on the actual Master Host
     if (
-      !tenantConfig ||
-      (!tenantConfig.apiKey && !isStandalone) ||
-      (tenantConfig.projectId === firebaseConfig.projectId && tenantDbId === masterDbId)
+      isMaster &&
+      (!tenantConfig ||
+      !tenantConfig.apiKey ||
+      (tenantConfig.projectId === firebaseConfig.projectId && tenantDbId === masterDbId))
     ) {
       app = masterApp;
       db = masterDb;
-    } else if (isStandalone && !tenantConfig?.apiKey) {
-      // Standalone platform without custom API key: initialize a 100% DISCONNECTED dummy app
+    } else if (!tenantConfig?.apiKey) {
+      // Non-master host (Standalone / Sub-tenant) without custom API key: initialize a 100% DISCONNECTED dummy app
       const dummyConfig = {
         apiKey: 'AIzaSyStandaloneDummyKeyZeroData00000',
         authDomain: 'standalone-isolated-platform.firebaseapp.com',
