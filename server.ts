@@ -1139,6 +1139,9 @@ async function startServer() {
       }
 
       const tenantObj = payload.tenant || payload || {};
+      const isSqliteEngine = (payload.dbEngine === 'sqlite' || tenantObj.dbEngine === 'sqlite' || payload.isStandalone === true);
+
+      const effectiveFirebaseConfig = isSqliteEngine ? '' : (firebaseConfig || '');
 
       const fullTenantObj = {
         name,
@@ -1169,7 +1172,9 @@ async function startServer() {
         ...tenantObj,
         subdomain: tenantId,
         customDomain,
-        firebaseConfig,
+        firebaseConfig: effectiveFirebaseConfig,
+        dbEngine: isSqliteEngine ? 'sqlite' : 'firebase',
+        isStandalone: true,
         supabaseUrl,
         supabaseAnonKey,
       };
@@ -1182,12 +1187,14 @@ async function startServer() {
 # Standalone Environment Config for Tenant: ${name}
 # Subdomain / ID: ${tenantId}
 # Custom Domain: ${customDomain}
+# DB Engine: ${isSqliteEngine ? 'Local SQLite (Zero Database)' : 'Cloud Database'}
 # Generated Date: ${new Date().toLocaleString('ar-EG')}
 # =======================================================
 
 VITE_TENANT_ID=${tenantId}
 VITE_CUSTOM_DOMAIN=${customDomain}
-VITE_FIREBASE_CONFIG='${firebaseConfig}'
+VITE_DB_TYPE=${isSqliteEngine ? 'sqlite' : 'firebase'}
+VITE_FIREBASE_CONFIG='${effectiveFirebaseConfig}'
 VITE_SUPABASE_URL=${supabaseUrl}
 VITE_SUPABASE_ANON_KEY=${supabaseAnonKey}
 VITE_STANDALONE_MODE=true
@@ -1196,9 +1203,9 @@ VITE_TENANT_DATA='${JSON.stringify(fullTenantObj)}'
       zip.file('.env', envContent);
 
       // 2. firebase-applet-config.json
-      let jsonStr = firebaseConfig || '{}';
+      let jsonStr = effectiveFirebaseConfig || '{}';
       try {
-        jsonStr = JSON.stringify(JSON.parse(firebaseConfig), null, 2);
+        jsonStr = JSON.stringify(JSON.parse(effectiveFirebaseConfig), null, 2);
       } catch (e) {}
       zip.file('firebase-applet-config.json', jsonStr);
 
@@ -1226,12 +1233,13 @@ VITE_TENANT_DATA='${JSON.stringify(fullTenantObj)}'
       // 5. DEPLOYMENT_GUIDE.md
       zip.file('DEPLOYMENT_GUIDE.md', `# 🚀 دليل استضافة المنصة المستقلة للمعلم: ${name}
 تاريخ الإصدار: ${new Date().toLocaleDateString('ar-EG')}
+نوع المنصة: ${isSqliteEngine ? '🟢 ذاتي شامل (Server + SQLite)' : '🔵 منصة سحابية'}
 الدومين المستهدف: ${customDomain}
 
 ## 1. الرفع السريع على Vercel / Netlify
 1. قم بفك الضغط عن هذا المجلد.
 2. اسحب المجلد إلى Vercel أو Netlify Drop (app.netlify.com/drop).
-3. اضغط Deploy وستعمل المنصة فوراً بدون أي أخطاء!
+3. اضغط Deploy وستعمل المنصة فوراً بدون أي أخطاء وببيانات زيرو نظيفة!
 
 ## 2. الرفع على Hostinger أو CPanel
 1. افتح لوحة التحكم في Hostinger أو CPanel.
@@ -1263,7 +1271,8 @@ VITE_TENANT_DATA='${JSON.stringify(fullTenantObj)}'
               const injectScript = `<script>
   window.VITE_TENANT_ID = "${tenantId}";
   window.VITE_CUSTOM_DOMAIN = "${customDomain}";
-  window.VITE_FIREBASE_CONFIG = '${firebaseConfig}';
+  window.VITE_DB_TYPE = "${isSqliteEngine ? 'sqlite' : 'firebase'}";
+  window.VITE_FIREBASE_CONFIG = '${effectiveFirebaseConfig}';
   window.VITE_SUPABASE_URL = "${supabaseUrl}";
   window.VITE_SUPABASE_ANON_KEY = "${supabaseAnonKey}";
   window.VITE_STANDALONE_MODE = "true";
