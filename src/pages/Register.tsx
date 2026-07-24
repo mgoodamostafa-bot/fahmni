@@ -154,7 +154,12 @@ export const Register: React.FC = () => {
         schoolName: schoolName.trim(),
       });
 
-      navigate('/', { replace: true });
+      if (isFirstUser || userRole === 'teacher' || userRole === 'admin') {
+        alert('🎉 مرحباً بك! تم تعيين وتفعيل حسابك كمدير وصاحب هذه المنصة المستقلة بنجاح.');
+        navigate('/admin/dashboard', { replace: true });
+      } else {
+        navigate('/', { replace: true });
+      }
     } catch (err: any) {
       console.error('Registration Error:', err);
       if (err.code === 'auth/email-already-in-use') {
