@@ -90,11 +90,19 @@ export const initTenantApp = (tenantConfig?: any) => {
       app = masterApp;
       db = masterDb;
     } else if (isStandalone && !tenantConfig?.apiKey) {
-      // Standalone platform without custom API key: initialize an isolated Firestore app instance
+      // Standalone platform without custom API key: initialize a 100% DISCONNECTED dummy app
+      const dummyConfig = {
+        apiKey: 'AIzaSyStandaloneDummyKeyZeroData00000',
+        authDomain: 'standalone-isolated-platform.firebaseapp.com',
+        projectId: `standalone-isolated-platform-${Date.now()}`,
+        storageBucket: 'standalone-isolated-platform.appspot.com',
+        messagingSenderId: '000000000000',
+        appId: '1:000000000000:web:0000000000000000000000'
+      };
       if (getApps().some((a) => a.name === 'STANDALONE')) {
         app = getApp('STANDALONE');
       } else {
-        app = initializeApp({ ...firebaseConfig, projectId: `standalone-${Date.now()}` }, 'STANDALONE');
+        app = initializeApp(dummyConfig, 'STANDALONE');
       }
       db = getOrInitializeFirestore(app, '(default)');
     } else {
@@ -140,23 +148,43 @@ export const getCurrentTenantId = (): string | null => {
 };
 
 export const getTenantCollection = (colName: string) => {
+  const isStandalone = typeof window !== 'undefined' && (
+    (window as any).VITE_STANDALONE_MODE === 'true' || 
+    import.meta.env.VITE_STANDALONE_MODE === 'true'
+  );
+
   const tenantId = getCurrentTenantId();
-  const currentDb = getTenantDb() || masterDb;
+  const currentDb = getTenantDb();
   const globalCollections = ['tenants', 'super_admin', 'system', 'system_releases'];
+
+  // Standalone platforms NEVER touch masterDb
+  if (isStandalone) {
+    return collection(currentDb || masterDb, colName);
+  }
 
   if (tenantId && currentDb === masterDb && !globalCollections.includes(colName)) {
     return collection(masterDb, 'tenants_data', tenantId, colName);
   }
-  return collection(currentDb, colName);
+  return collection(currentDb || masterDb, colName);
 };
 
 export const getTenantDoc = (colName: string, docId: string) => {
+  const isStandalone = typeof window !== 'undefined' && (
+    (window as any).VITE_STANDALONE_MODE === 'true' || 
+    import.meta.env.VITE_STANDALONE_MODE === 'true'
+  );
+
   const tenantId = getCurrentTenantId();
-  const currentDb = getTenantDb() || masterDb;
+  const currentDb = getTenantDb();
   const globalCollections = ['tenants', 'super_admin', 'system', 'system_releases'];
+
+  // Standalone platforms NEVER touch masterDb
+  if (isStandalone) {
+    return doc(currentDb || masterDb, colName, docId);
+  }
 
   if (tenantId && currentDb === masterDb && !globalCollections.includes(colName)) {
     return doc(masterDb, 'tenants_data', tenantId, colName, docId);
   }
-  return doc(currentDb, colName, docId);
+  return doc(currentDb || masterDb, colName, docId);
 };
