@@ -191,6 +191,42 @@ export const SuperAdminDashboard = () => {
     }
   };
 
+  const downloadSingleTenantBackup = async (tenant: Tenant) => {
+    try {
+      const res = await fetch(`/api/tenants/${tenant.subdomain || 'standalone'}/export-backup`);
+      if (!res.ok) throw new Error('فشل استخراج النسخة الاحتياطية للمنصة');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `backup_${tenant.subdomain || 'standalone'}_${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      alert(`🎉 تم تنزيل النسخة الاحتياطية الكاملة لمنصة (${tenant.name}) بنجاح!`);
+    } catch (err: any) {
+      alert('خطأ أثناء تنزيل النسخة الاحتياطية: ' + err.message);
+    }
+  };
+
+  const restoreSingleTenantBackup = async (tenant: Tenant, file: File) => {
+    try {
+      const text = await file.text();
+      const backupJson = JSON.parse(text);
+      const res = await fetch(`/api/tenants/${tenant.subdomain || 'standalone'}/restore-backup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(backupJson)
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'فشل استرجاع النسخة الاحتياطية');
+      }
+      alert(`🎉 تم استرجاع واستعادة كافة بيانات وصلاحيات منصة (${tenant.name}) بنجاح!`);
+    } catch (err: any) {
+      alert('خطأ في استرجاع النسخة الاحتياطية: ' + err.message);
+    }
+  };
+
   const generateStandaloneGuide = (tenant: Tenant) => {
     return `# 🚀 دليل استضافة وتشغيل المنصة المستقلة للمعلم: ${tenant.name}
 تاريخ الإصدار: ${new Date().toLocaleDateString('ar-EG')}
@@ -2760,6 +2796,49 @@ VITE_STANDALONE_MODE=true
                     >
                       <Download size={14} /> 🔄 توليد وتنزيل ملف هجرة SQL (.sql)
                     </button>
+                  </div>
+
+                  {/* Option 6: Independent Tenant Backup Export */}
+                  <div className="p-4 bg-white/[0.03] border border-white/10 rounded-2xl space-y-2.5 hover:border-emerald-500/40 transition-all group">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-white flex items-center gap-1.5">
+                        <Download size={15} className="text-emerald-400" /> تنزيل نسخة المنصة (.json)
+                      </span>
+                      <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-md font-bold">Backup</span>
+                    </div>
+                    <p className="text-[11px] text-gray-400">سحب نسخة احتياطية كاملة خاصة بهذة المنصة فقط بكل طلابها ودروسها.</p>
+                    <button
+                      type="button"
+                      onClick={() => downloadSingleTenantBackup(exporterTenant)}
+                      className="w-full py-2.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Download size={14} /> 📥 تنزيل النسخة الاحتياطية
+                    </button>
+                  </div>
+
+                  {/* Option 7: Independent Tenant Backup Restore / Upload */}
+                  <div className="p-4 bg-white/[0.03] border border-white/10 rounded-2xl space-y-2.5 hover:border-amber-500/40 transition-all group">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-white flex items-center gap-1.5">
+                        <Upload size={15} className="text-amber-400" /> رفع واسترجاع نسخة احتياطية
+                      </span>
+                      <span className="text-[10px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-md font-bold">Restore</span>
+                    </div>
+                    <p className="text-[11px] text-gray-400">رفع واستعادة نسخة احتياطية سابقة للمنصة وإعادة تغذيتها في قاعدة البيانات.</p>
+                    <label className="w-full py-2.5 bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                      <Upload size={14} /> 📤 اختيار ملف النسخة (.json)
+                      <input
+                        type="file"
+                        accept=".json"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            restoreSingleTenantBackup(exporterTenant, file);
+                          }
+                        }}
+                      />
+                    </label>
                   </div>
                 </div>
 

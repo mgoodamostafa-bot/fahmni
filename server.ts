@@ -1377,6 +1377,106 @@ VITE_TENANT_DATA='${JSON.stringify(fullTenantObj)}'
     }
   });
 
+  // API Endpoint - Export Single Tenant Complete JSON Backup
+  app.get('/api/tenants/:tenantId/export-backup', async (req, res) => {
+    try {
+      const { tenantId } = req.params;
+      const adminDb = getAdminDb();
+      if (!adminDb) {
+        return res.status(500).json({ error: 'Database admin instance not available' });
+      }
+
+      // Fetch tenant metadata
+      const tenantDoc = await adminDb.collection('tenants').doc(tenantId).get();
+      const tenantData = tenantDoc.exists ? tenantDoc.data() : { id: tenantId };
+
+      // Helper to fetch collection filtering by tenantId if applicable
+      async function getTenantCollection(colName: string) {
+        try {
+          const snap = await adminDb.collection(colName).where('tenantId', '==', tenantId).get();
+          return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        } catch (e) {
+          try {
+            const allSnap = await adminDb.collection(colName).get();
+            return allSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          } catch (e2) {
+            return [];
+          }
+        }
+      }
+
+      const backupObj = {
+        tenantId,
+        exportedAt: new Date().toISOString(),
+        tenant: tenantData,
+        users: await getTenantCollection('users'),
+        courses: await getTenantCollection('courses'),
+        lessons: await getTenantCollection('lessons'),
+        exams: await getTenantCollection('exams'),
+        questions: await getTenantCollection('questions'),
+        examResults: await getTenantCollection('examResults'),
+        chargeCards: await getTenantCollection('chargeCards')
+      };
+
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="backup_${tenantId}_${new Date().toISOString().slice(0, 10)}.json"`);
+      res.send(JSON.stringify(backupObj, null, 2));
+    } catch (err: any) {
+      console.error('Error exporting tenant backup:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API Endpoint - Restore Single Tenant Complete JSON Backup
+  app.post('/api/tenants/:tenantId/restore-backup', async (req, res) => {
+    try {
+      const { tenantId } = req.params;
+      const backupData = req.body;
+
+      if (!backupData || typeof backupData !== 'object') {
+        return res.status(400).json({ error: 'ملف النسخة الاحتياطية غير صالح' });
+      }
+
+      const adminDb = getAdminDb();
+      if (!adminDb) {
+        return res.status(500).json({ error: 'Database admin instance not available' });
+      }
+
+      console.log(`Starting restore process for tenant ${tenantId}...`);
+
+      // Restore tenant doc
+      if (backupData.tenant) {
+        await adminDb.collection('tenants').doc(tenantId).set(backupData.tenant, { merge: true });
+      }
+
+      // Batch restore helper
+      async function restoreCollection(colName: string, items?: any[]) {
+        if (!items || !Array.isArray(items)) return;
+        for (const item of items) {
+          if (item && item.id) {
+            const itemId = item.id;
+            const dataToSave = { ...item, tenantId };
+            delete dataToSave.id;
+            await adminDb.collection(colName).doc(itemId).set(dataToSave, { merge: true });
+          }
+        }
+      }
+
+      await restoreCollection('users', backupData.users);
+      await restoreCollection('courses', backupData.courses);
+      await restoreCollection('lessons', backupData.lessons);
+      await restoreCollection('exams', backupData.exams);
+      await restoreCollection('questions', backupData.questions);
+      await restoreCollection('examResults', backupData.examResults);
+      await restoreCollection('chargeCards', backupData.chargeCards);
+
+      res.json({ success: true, message: `تم استرجاع نسخة المنصة (${tenantId}) بنجاح!` });
+    } catch (err: any) {
+      console.error('Error restoring tenant backup:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Backend API - Generates SQL Schema + SQL Migration Script for MySQL / PostgreSQL
   app.all('/api/generate-tenant-sql-migration', async (req, res) => {
     try {
