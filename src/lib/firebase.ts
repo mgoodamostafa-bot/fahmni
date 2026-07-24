@@ -64,8 +64,14 @@ export const isMasterHost = (): boolean => {
   const isExplicitStandalone = (window as any).VITE_STANDALONE_MODE === 'true' || import.meta.env.VITE_STANDALONE_MODE === 'true';
   if (isExplicitStandalone) return false;
 
-  // Master host is ONLY localhost/127.0.0.1 or fahmni.me / www.fahmni.me
-  if (host === 'localhost' || host === '127.0.0.1' || host === 'fahmni.me' || host === 'www.fahmni.me') {
+  // Master host includes localhost (and subdomains like xxx.localhost) AND fahmni.me (and subdomains like xxx.fahmni.me)
+  if (
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host.endsWith('.localhost') ||
+    host === 'fahmni.me' ||
+    host.endsWith('.fahmni.me')
+  ) {
     return true;
   }
   return false;
