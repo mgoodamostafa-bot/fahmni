@@ -146,7 +146,12 @@ export const SuperAdminDashboard = () => {
         body: JSON.stringify(tenant)
       });
       if (!res.ok) {
-        throw new Error(`فشل استخراج ملفات المنصة (${res.statusText})`);
+        let errMsg = res.statusText;
+        try {
+          const errJson = await res.json();
+          if (errJson?.error) errMsg = errJson.error;
+        } catch (e) {}
+        throw new Error(`فشل استخراج ملفات المنصة (${errMsg})`);
       }
 
       const blob = await res.blob();

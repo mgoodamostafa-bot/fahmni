@@ -109,8 +109,9 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
   res.json({ received: true });
 });
 
-// Regular JSON parsing for other API routes
-app.use(express.json());
+// Regular JSON parsing for other API routes (increased limit to 50mb for exporter tenant payload)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Global API Logger for diagnostic
 app.use('/api', (req, res, next) => {
