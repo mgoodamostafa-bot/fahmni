@@ -94,34 +94,44 @@ export const Register: React.FC = () => {
     try {
       const isSqlEngine = (window as any).VITE_DB_TYPE === 'sqlite' || import.meta.env.VITE_DB_TYPE === 'sqlite';
       if (isSqlEngine) {
-        const res = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email,
-            password,
-            displayName: name.trim(),
-            studentPhone,
-            motherPhone,
-            fatherPhone,
-            schoolName,
-            grade,
-            level: stage
-          })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'فشل إنشاء الحساب في قاعدة بيانات SQLite المحلية');
-        
-        localStorage.setItem('fahmni_sqlite_user', JSON.stringify(data.user));
-        if (data.user.role === 'admin' || data.isFirstUser) {
-          alert('🎉 مرحباً بك! تم إنشاء المنصة المستقلة وحساب المدير بنجاح.');
-          navigate('/admin/dashboard', { replace: true });
-        } else {
-          alert('🎉 تم إنشاء حسابك بنجاح!');
-          navigate('/', { replace: true });
+        try {
+          const res = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email,
+              password,
+              displayName: name.trim(),
+              studentPhone,
+              motherPhone,
+              fatherPhone,
+              schoolName,
+              grade,
+              level: stage
+            })
+          });
+          const text = await res.text();
+          let data: any = {};
+          try { data = JSON.parse(text); } catch (e) {}
+          if (res.ok && data.user) {
+            localStorage.setItem('fahmni_sqlite_user', JSON.stringify(data.user));
+            if (data.user.role === 'admin' || data.isFirstUser) {
+              alert('🎉 مرحباً بك! تم إنشاء المنصة المستقلة وحساب المدير بنجاح.');
+              navigate('/admin/dashboard', { replace: true });
+            } else {
+              alert('🎉 تم إنشاء حسابك بنجاح!');
+              navigate('/', { replace: true });
+            }
+            setLoading(false);
+            return;
+          }
+          if (data.error) throw new Error(data.error);
+        } catch (sqlErr: any) {
+          if ((window as any).VITE_DB_TYPE === 'sqlite') {
+            throw sqlErr;
+          }
+          console.warn('SQLite API endpoint unavailable, falling back to Firebase Auth registration.', sqlErr);
         }
-        setLoading(false);
-        return;
       }
 
       const result = await createUserWithEmailAndPassword(getTenantAuth(), email, password);

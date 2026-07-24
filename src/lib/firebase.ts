@@ -190,35 +190,11 @@ export const getCurrentTenantId = (): string | null => {
 };
 
 export const getTenantCollection = (colName: string) => {
-  const isMaster = isMasterHost();
-  const tenantId = getCurrentTenantId();
   const currentDb = getTenantDb() || masterDb;
-  const globalCollections = ['tenants', 'super_admin', 'system', 'system_releases'];
-
-  // Non-master domains (like Vercel standalone deployments) ALWAYS isolate collections under tenants_data/tenantId/
-  if (!isMaster && tenantId && !globalCollections.includes(colName)) {
-    return collection(currentDb, 'tenants_data', tenantId, colName);
-  }
-
-  if (tenantId && currentDb === masterDb && !globalCollections.includes(colName)) {
-    return collection(masterDb, 'tenants_data', tenantId, colName);
-  }
   return collection(currentDb, colName);
 };
 
 export const getTenantDoc = (colName: string, docId: string) => {
-  const isMaster = isMasterHost();
-  const tenantId = getCurrentTenantId();
   const currentDb = getTenantDb() || masterDb;
-  const globalCollections = ['tenants', 'super_admin', 'system', 'system_releases'];
-
-  // Non-master domains (like Vercel standalone deployments) ALWAYS isolate docs under tenants_data/tenantId/
-  if (!isMaster && tenantId && !globalCollections.includes(colName)) {
-    return doc(currentDb, 'tenants_data', tenantId, colName, docId);
-  }
-
-  if (tenantId && currentDb === masterDb && !globalCollections.includes(colName)) {
-    return doc(masterDb, 'tenants_data', tenantId, colName, docId);
-  }
   return doc(currentDb, colName, docId);
 };

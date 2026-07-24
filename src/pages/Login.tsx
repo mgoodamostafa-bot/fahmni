@@ -95,23 +95,33 @@ export const Login: React.FC = () => {
     try {
       const isSqlEngine = (window as any).VITE_DB_TYPE === 'sqlite' || import.meta.env.VITE_DB_TYPE === 'sqlite';
       if (isSqlEngine) {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'فشل تسجيل الدخول');
-        
-        localStorage.setItem('fahmni_sqlite_user', JSON.stringify(data.user));
-        alert('🎉 تم تسجيل الدخول بنجاح!');
-        if (data.user.role === 'admin') {
-          navigate('/admin/dashboard', { replace: true });
-        } else {
-          navigate('/', { replace: true });
+        try {
+          const res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+          });
+          const text = await res.text();
+          let data: any = {};
+          try { data = JSON.parse(text); } catch (e) {}
+          if (res.ok && data.user) {
+            localStorage.setItem('fahmni_sqlite_user', JSON.stringify(data.user));
+            alert('🎉 تم تسجيل الدخول بنجاح!');
+            if (data.user.role === 'admin') {
+              navigate('/admin/dashboard', { replace: true });
+            } else {
+              navigate('/', { replace: true });
+            }
+            setLoading(false);
+            return;
+          }
+          if (data.error) throw new Error(data.error);
+        } catch (sqlErr: any) {
+          if ((window as any).VITE_DB_TYPE === 'sqlite') {
+            throw sqlErr;
+          }
+          console.warn('SQLite API endpoint unavailable, falling back to Firebase Auth login.', sqlErr);
         }
-        setLoading(false);
-        return;
       }
 
       const userCredential = await signInWithEmailAndPassword(getTenantAuth(), email, password);
