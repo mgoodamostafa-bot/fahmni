@@ -121,6 +121,31 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const hostname = window.location.hostname;
     const parts = hostname.split('.');
 
+    // 🚀 STANDALONE MODE DETECTION: If VITE_TENANT_ID or VITE_STANDALONE_MODE is specified
+    const envTenantId = (window as any).VITE_TENANT_ID || import.meta.env.VITE_TENANT_ID;
+    const isStandalone = (window as any).VITE_STANDALONE_MODE === 'true' || import.meta.env.VITE_STANDALONE_MODE === 'true' || (envTenantId && envTenantId !== 'main');
+
+    if (isStandalone && envTenantId) {
+      console.log('🚀 TenantContext: Standalone Mode Active for Tenant:', envTenantId);
+      const standaloneData = {
+        subdomain: envTenantId,
+        customDomain: (window as any).VITE_CUSTOM_DOMAIN || import.meta.env.VITE_CUSTOM_DOMAIN || hostname,
+        firebaseConfig: (window as any).VITE_FIREBASE_CONFIG || import.meta.env.VITE_FIREBASE_CONFIG || '',
+        supabaseUrl: (window as any).VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL || '',
+        supabaseAnonKey: (window as any).VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+      };
+
+      setTenantId(envTenantId);
+      setIsMainSite(false);
+      setTenantData(standaloneData);
+      applyTenantBranding(standaloneData);
+      initFirebaseFromTenantData(standaloneData);
+      initTenantSupabase(standaloneData);
+      setIsLoading(false);
+      clearTimeout(globalFailsafe);
+      return;
+    }
+
     let extractedTenant: string | null = null;
     let mainSite = true;
 
