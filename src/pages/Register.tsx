@@ -118,18 +118,23 @@ export const Register: React.FC = () => {
         newStudentId = `12610${Date.now().toString().slice(-4)}`;
       }
 
-      // Check if this is the first user — they become the teacher/owner
+      // Check if this is the first user — they become the platform owner/admin
       let userRole = 'student';
       let isFirstUser = false;
       try {
         const { collection, getDocs, query, limit } = await import('firebase/firestore');
         const usersSnap = await getDocs(query(collection(getTenantDb(), 'users'), limit(1)));
         if (usersSnap.empty) {
-          userRole = 'teacher';
+          userRole = 'admin';
           isFirstUser = true;
         }
       } catch (checkErr) {
-        console.warn('Could not check for existing users, defaulting to student.', checkErr);
+        console.warn('Could not check for existing users, fallback check for standalone.', checkErr);
+        const isStandalone = (window as any).VITE_STANDALONE_MODE === 'true' || import.meta.env.VITE_STANDALONE_MODE === 'true';
+        if (isStandalone) {
+          userRole = 'admin';
+          isFirstUser = true;
+        }
       }
 
       // Save user to Firestore with all detailed form data
