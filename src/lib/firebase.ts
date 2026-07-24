@@ -90,10 +90,10 @@ if (isMasterHost()) {
   app = masterApp;
   db = masterDb;
 } else {
-  if (getApps().some((a) => a.name === 'STANDALONE')) {
-    app = getApp('STANDALONE');
+  if (getApps().some((a) => a.name === 'TENANT_HOST')) {
+    app = getApp('TENANT_HOST');
   } else {
-    app = initializeApp(dummyStandaloneConfig, 'STANDALONE');
+    app = initializeApp(firebaseConfig, 'TENANT_HOST');
   }
   db = getOrInitializeFirestore(app, '(default)');
 }
@@ -112,11 +112,6 @@ export const initTenantApp = (tenantConfig?: any) => {
     const tenantDbId = tenantConfig?.firestoreDatabaseId || '(default)';
 
     const isMaster = isMasterHost();
-    const isStandalone = !isMaster || (typeof window !== 'undefined' && (
-      (window as any).VITE_STANDALONE_MODE === 'true' || 
-      import.meta.env.VITE_STANDALONE_MODE === 'true' ||
-      tenantConfig?.isStandalone
-    ));
 
     // Only reuse masterApp if we are on the actual Master Host
     if (
@@ -127,23 +122,7 @@ export const initTenantApp = (tenantConfig?: any) => {
     ) {
       app = masterApp;
       db = masterDb;
-    } else if (!tenantConfig?.apiKey) {
-      // Non-master host (Standalone / Sub-tenant) without custom API key: initialize a 100% DISCONNECTED dummy app
-      const dummyConfig = {
-        apiKey: 'AIzaSyStandaloneDummyKeyZeroData00000',
-        authDomain: 'standalone-isolated-platform.firebaseapp.com',
-        projectId: `standalone-isolated-platform-${Date.now()}`,
-        storageBucket: 'standalone-isolated-platform.appspot.com',
-        messagingSenderId: '000000000000',
-        appId: '1:000000000000:web:0000000000000000000000'
-      };
-      if (getApps().some((a) => a.name === 'STANDALONE')) {
-        app = getApp('STANDALONE');
-      } else {
-        app = initializeApp(dummyConfig, 'STANDALONE');
-      }
-      db = getOrInitializeFirestore(app, '(default)');
-    } else {
+    } else if (tenantConfig && tenantConfig.apiKey) {
       if (getApps().some((a) => a.name === 'TENANT')) {
         app = getApp('TENANT');
         const tenantDatabaseId = tenantConfig.firestoreDatabaseId;
@@ -153,6 +132,14 @@ export const initTenantApp = (tenantConfig?: any) => {
         const tenantDatabaseId = tenantConfig.firestoreDatabaseId;
         db = getOrInitializeFirestore(app, tenantDatabaseId || '(default)');
       }
+    } else {
+      // Non-master host without custom API key: use dedicated tenant host app instance
+      if (getApps().some((a) => a.name === 'TENANT_HOST')) {
+        app = getApp('TENANT_HOST');
+      } else {
+        app = initializeApp(firebaseConfig, 'TENANT_HOST');
+      }
+      db = getOrInitializeFirestore(app, '(default)');
     }
     auth = getAuth(app);
     storage = getStorage(app);
@@ -186,43 +173,35 @@ export const getCurrentTenantId = (): string | null => {
 };
 
 export const getTenantCollection = (colName: string) => {
-  const isStandalone = typeof window !== 'undefined' && (
-    (window as any).VITE_STANDALONE_MODE === 'true' || 
-    import.meta.env.VITE_STANDALONE_MODE === 'true'
-  );
-
+  const isMaster = isMasterHost();
   const tenantId = getCurrentTenantId();
-  const currentDb = getTenantDb();
+  const currentDb = getTenantDb() || masterDb;
   const globalCollections = ['tenants', 'super_admin', 'system', 'system_releases'];
 
-  // Standalone platforms NEVER touch masterDb
-  if (isStandalone) {
-    return collection(currentDb || masterDb, colName);
+  // Non-master domains (like Vercel standalone deployments) ALWAYS isolate collections under tenants_data/tenantId/
+  if (!isMaster && tenantId && !globalCollections.includes(colName)) {
+    return collection(currentDb, 'tenants_data', tenantId, colName);
   }
 
   if (tenantId && currentDb === masterDb && !globalCollections.includes(colName)) {
     return collection(masterDb, 'tenants_data', tenantId, colName);
   }
-  return collection(currentDb || masterDb, colName);
+  return collection(currentDb, colName);
 };
 
 export const getTenantDoc = (colName: string, docId: string) => {
-  const isStandalone = typeof window !== 'undefined' && (
-    (window as any).VITE_STANDALONE_MODE === 'true' || 
-    import.meta.env.VITE_STANDALONE_MODE === 'true'
-  );
-
+  const isMaster = isMasterHost();
   const tenantId = getCurrentTenantId();
-  const currentDb = getTenantDb();
+  const currentDb = getTenantDb() || masterDb;
   const globalCollections = ['tenants', 'super_admin', 'system', 'system_releases'];
 
-  // Standalone platforms NEVER touch masterDb
-  if (isStandalone) {
-    return doc(currentDb || masterDb, colName, docId);
+  // Non-master domains (like Vercel standalone deployments) ALWAYS isolate docs under tenants_data/tenantId/
+  if (!isMaster && tenantId && !globalCollections.includes(colName)) {
+    return doc(currentDb, 'tenants_data', tenantId, colName, docId);
   }
 
   if (tenantId && currentDb === masterDb && !globalCollections.includes(colName)) {
     return doc(masterDb, 'tenants_data', tenantId, colName, docId);
   }
-  return doc(currentDb || masterDb, colName, docId);
+  return doc(currentDb, colName, docId);
 };
