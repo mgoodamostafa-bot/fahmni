@@ -1300,6 +1300,50 @@ VITE_TENANT_DATA='${JSON.stringify(fullTenantObj)}'
       res.status(500).json({ error: err.message });
     }
   });
+  // Backend API - Generates SQL Schema + SQL Migration Script for MySQL / PostgreSQL
+  app.all('/api/generate-tenant-sql-migration', async (req, res) => {
+    try {
+      const payload = req.body || req.query || {};
+      const tenantId = payload.subdomain || payload.tenantId || 'standalone';
+      
+      const schemaSqlPath = path.join(process.cwd(), 'src', 'lib', 'schema.sql');
+      let schemaSql = '';
+      try {
+        schemaSql = await fs.readFile(schemaSqlPath, 'utf-8');
+      } catch (e) {
+        schemaSql = `-- Universal Schema File --\n`;
+      }
+
+      // Convert payload or backup data into SQL statements
+      let dataSql = '';
+      const backupData = payload.backupData || payload.tenant || payload;
+      if (backupData) {
+        const { convertFirebaseJsonToSql } = await import('./src/services/migrationEngine.js').catch(async () => {
+          return await import('./src/services/migrationEngine.ts');
+        });
+        dataSql = convertFirebaseJsonToSql({
+          tenantId,
+          exportedAt: new Date().toISOString(),
+          users: backupData.users || [],
+          courses: backupData.courses || [],
+          lessons: backupData.lessons || [],
+          exams: backupData.exams || [],
+          questions: backupData.questions || [],
+          examResults: backupData.examResults || [],
+          chargeCards: backupData.chargeCards || []
+        });
+      }
+
+      const fullSqlScript = `${schemaSql}\n\n-- ============================================================\n-- TENANT MIGRATION DATA\n-- ============================================================\n${dataSql}`;
+
+      res.setHeader('Content-Type', 'application/sql');
+      res.setHeader('Content-Disposition', `attachment; filename="fahmni_tenant_${tenantId}_migration.sql"`);
+      res.send(fullSqlScript);
+    } catch (err: any) {
+      console.error('Error generating tenant SQL migration:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

@@ -170,6 +170,27 @@ export const SuperAdminDashboard = () => {
     }
   };
 
+  const downloadSqlMigration = async (tenant: Tenant) => {
+    try {
+      const res = await fetch('/api/generate-tenant-sql-migration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenant, subdomain: tenant.subdomain })
+      });
+      if (!res.ok) throw new Error('فشل توليد ملف هجرة SQL');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `fahmni_tenant_${tenant.subdomain}_migration.sql`;
+      a.click();
+      URL.revokeObjectURL(url);
+      alert('🎉 تم توليد وتنزيل ملف استيراد SQL بنجاح! يمكن وضعه في MySQL على Hostinger أو Vercel Postgres.');
+    } catch (err: any) {
+      alert('خطأ في توليد ملف SQL: ' + err.message);
+    }
+  };
+
   const generateStandaloneGuide = (tenant: Tenant) => {
     return `# 🚀 دليل استضافة وتشغيل المنصة المستقلة للمعلم: ${tenant.name}
 تاريخ الإصدار: ${new Date().toLocaleDateString('ar-EG')}
@@ -2720,6 +2741,24 @@ VITE_STANDALONE_MODE=true
                       className="w-full py-2.5 bg-purple-500/10 hover:bg-purple-500 text-purple-400 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Download size={14} /> تنزيل سكربت التجميع (.bat)
+                    </button>
+                  </div>
+
+                  {/* Option 5: MySQL / PostgreSQL Migration .SQL File */}
+                  <div className="p-4 bg-white/[0.03] border border-white/10 rounded-2xl space-y-2.5 hover:border-cyan-500/40 transition-all group col-span-1 sm:col-span-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-white flex items-center gap-1.5">
+                        <Database size={15} className="text-cyan-400" /> هجرة واستيراد قواعد بيانات MySQL / PostgreSQL (.sql)
+                      </span>
+                      <span className="text-[10px] bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded-md font-bold">SQL Import</span>
+                    </div>
+                    <p className="text-[11px] text-gray-400">توليد ملف استعلامات SQL كامل ونقل كافة الطلاب والدروس والنتائج إلى سيرفر Hostinger أو Vercel Postgres الخاص بالمعلم.</p>
+                    <button
+                      type="button"
+                      onClick={() => downloadSqlMigration(exporterTenant)}
+                      className="w-full py-2.5 bg-cyan-500/10 hover:bg-cyan-500 text-cyan-400 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Download size={14} /> 🔄 توليد وتنزيل ملف هجرة SQL (.sql)
                     </button>
                   </div>
                 </div>
