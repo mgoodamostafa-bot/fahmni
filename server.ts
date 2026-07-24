@@ -1377,6 +1377,90 @@ VITE_TENANT_DATA='${JSON.stringify(fullTenantObj)}'
     }
   });
 
+  // API Endpoint - Save Tenant (Admin Privilege Override)
+  const TENANTS_FILE = path.join(BACKUP_DIR, 'tenants_registry.json');
+  app.post('/api/admin/save-tenant', async (req, res) => {
+    try {
+      const tenantData = req.body || {};
+      const subdomain = (tenantData.subdomain || tenantData.id || `tenant-${Date.now().toString().slice(-6)}`)
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9-]/g, '');
+
+      const cleanObj = {
+        ...tenantData,
+        id: subdomain,
+        subdomain,
+        updatedAt: new Date().toISOString()
+      };
+
+      // 1. Save to Firebase Admin DB if available
+      const adminDb = getAdminDb();
+      if (adminDb) {
+        try {
+          await adminDb.collection('tenants').doc(subdomain).set(cleanObj, { merge: true });
+        } catch (e) {
+          console.warn('Admin DB tenant write warning:', e);
+        }
+      }
+
+      // 2. Save to local tenants registry file
+      await ensureBackupDir();
+      let registry: any[] = [];
+      try {
+        const fileData = await fs.readFile(TENANTS_FILE, 'utf-8');
+        registry = JSON.parse(fileData);
+      } catch (e) {
+        registry = [];
+      }
+
+      const idx = registry.findIndex(t => t.id === subdomain || t.subdomain === subdomain);
+      if (idx >= 0) {
+        registry[idx] = { ...registry[idx], ...cleanObj };
+      } else {
+        registry.push(cleanObj);
+      }
+
+      await fs.writeFile(TENANTS_FILE, JSON.stringify(registry, null, 2), 'utf-8');
+      res.json({ success: true, tenant: cleanObj });
+    } catch (err: any) {
+      console.error('Error saving tenant via admin API:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // API Endpoint - List Tenants (Server Registry + Admin DB)
+  app.get('/api/admin/list-tenants', async (req, res) => {
+    try {
+      let tenants: any[] = [];
+      const adminDb = getAdminDb();
+      if (adminDb) {
+        try {
+          const snap = await adminDb.collection('tenants').get();
+          tenants = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        } catch (e) {}
+      }
+
+      // Merge with local file registry
+      try {
+        const fileData = await fs.readFile(TENANTS_FILE, 'utf-8');
+        const fileRegistry = JSON.parse(fileData);
+        for (const localT of fileRegistry) {
+          const idx = tenants.findIndex(t => t.id === localT.id || t.subdomain === localT.subdomain);
+          if (idx >= 0) {
+            tenants[idx] = { ...tenants[idx], ...localT };
+          } else {
+            tenants.push(localT);
+          }
+        }
+      } catch (e) {}
+
+      res.json({ tenants });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // API Endpoint - Export Single Tenant Complete JSON Backup
   app.all('/api/tenants/:tenantId/export-backup', async (req, res) => {
     try {

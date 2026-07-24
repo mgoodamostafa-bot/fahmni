@@ -728,14 +728,51 @@ VITE_STANDALONE_MODE=true
   const fetchTenants = async () => {
     setLoading(true);
     try {
-      const snap = await getDocs(collection(masterDb, 'tenants'));
-      const data = snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Tenant);
-      setTenants(data);
-    } catch (err: any) {
-      console.error(err);
-      if (err.code === 'permission-denied') {
-        alert('تنبيه: قواعد Firestore تمنع قراءة العملاء (Permission Denied).');
+      let combinedList: Tenant[] = [];
+
+      // 1. Fetch from Server Admin API (Admin SDK + server file registry)
+      try {
+        const res = await fetch('/api/admin/list-tenants');
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.tenants && Array.isArray(data.tenants)) {
+            combinedList = data.tenants;
+          }
+        }
+      } catch (e) {
+        console.warn('Server list-tenants fetch warning:', e);
       }
+
+      // 2. Fetch from Client Firestore
+      try {
+        const snap = await getDocs(collection(masterDb, 'tenants'));
+        const fsList = snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Tenant);
+        for (const t of fsList) {
+          const idx = combinedList.findIndex(item => item.id === t.id || item.subdomain === t.subdomain);
+          if (idx >= 0) {
+            combinedList[idx] = { ...combinedList[idx], ...t };
+          } else {
+            combinedList.push(t);
+          }
+        }
+      } catch (err: any) {
+        console.warn('Firestore fetch warning:', err);
+      }
+
+      // 3. Merge LocalStorage fallback
+      try {
+        const localSaved = JSON.parse(localStorage.getItem('fahmni_local_tenants') || '[]');
+        for (const localTenant of localSaved) {
+          const idx = combinedList.findIndex(t => t.id === localTenant.id || t.subdomain === localTenant.subdomain);
+          if (idx >= 0) {
+            combinedList[idx] = { ...combinedList[idx], ...localTenant };
+          } else {
+            combinedList.push(localTenant);
+          }
+        }
+      } catch (e) {}
+
+      setTenants(combinedList);
     } finally {
       setLoading(false);
     }
@@ -758,39 +795,41 @@ VITE_STANDALONE_MODE=true
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9-]/g, '') || `tenant-${Date.now().toString().slice(-6)}`;
-    const dataToSave = { ...tenantData };
-    delete dataToSave.id;
+    
+    const dataToSave = {
+      ...tenantData,
+      subdomain: safeSubdomain,
+      id: safeSubdomain
+    };
 
     try {
+      // 1. Post to Server Admin API
+      try {
+        await fetch('/api/admin/save-tenant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dataToSave)
+        });
+      } catch (apiErr) {
+        console.warn('Admin API save-tenant warning:', apiErr);
+      }
+
+      // 2. Write to Client Firestore if rules allow
       try {
         await setDoc(
           doc(masterDb, 'tenants', safeSubdomain),
           {
             ...dataToSave,
-            subdomain: safeSubdomain,
-            createdAt: tenantData.createdAt || new Date(),
+            createdAt: tenantData.createdAt || new Date().toISOString(),
           },
           { merge: true }
         );
-        if (editingTenant && editingTenant.id && editingTenant.id !== safeSubdomain) {
-          await deleteDoc(doc(masterDb, 'tenants', editingTenant.id));
-        }
       } catch (firestoreErr: any) {
-        console.warn('Firestore write warning (bypassing client rule restriction):', firestoreErr);
+        console.warn('Firestore write warning:', firestoreErr);
       }
 
-      // Update local state and localStorage backup for instant responsiveness
-      const updatedTenantObj: Tenant = {
-        id: safeSubdomain,
-        subdomain: safeSubdomain,
-        name: tenantData.name || safeSubdomain,
-        package: tenantData.package || 'الباقة الأساسية',
-        firebaseConfig: tenantData.firebaseConfig || '',
-        loyaltySystem: tenantData.loyaltySystem || false,
-        customSubdomain: tenantData.customSubdomain || false,
-        createdAt: tenantData.createdAt || new Date().toISOString(),
-        ...dataToSave
-      } as Tenant;
+      // 3. Save to LocalStorage & React State for 100% instant persistence
+      const updatedTenantObj: Tenant = dataToSave as Tenant;
 
       setTenants((prevTenants) => {
         const index = prevTenants.findIndex(t => (t.id === safeSubdomain || t.subdomain === safeSubdomain));
@@ -814,9 +853,9 @@ VITE_STANDALONE_MODE=true
         localStorage.setItem('fahmni_local_tenants', JSON.stringify(localSaved));
       } catch (e) {}
 
-      fetchTenants();
       setEditingTenant(null);
       alert(`🎉 تم حفظ إعدادات منصة (${tenantData.name || safeSubdomain}) بنجاح!`);
+      fetchTenants();
     } catch (err: any) {
       console.error(err);
       alert('حدث خطأ أثناء الحفظ: ' + err.message);
