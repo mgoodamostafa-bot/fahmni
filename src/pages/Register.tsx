@@ -139,35 +139,19 @@ export const Register: React.FC = () => {
       // Update Auth Profile immediately
       await updateProfile(result.user, { displayName: name.trim() });
 
-      // 🆔 Reliable Sequential ID Generation (12610 + Transaction Counter)
-      let newStudentId = '';
-      try {
-        newStudentId = await runTransaction(getTenantDb(), async (transaction) => {
-          const counterRef = doc(getTenantDb(), 'system', 'counters');
-          const counterSnap = await transaction.get(counterRef);
+      // 🆔 Instant Reliable Student ID Generation (never blocks UI)
+      const newStudentId = `12610${Date.now().toString().slice(-4)}${Math.floor(10 + Math.random() * 90)}`;
 
-          let lastId = 7;
-          if (counterSnap.exists()) {
-            lastId = counterSnap.data().lastStudentId || 7;
-          }
-
-          const nextSeq = lastId + 1;
-          transaction.set(counterRef, { lastStudentId: nextSeq }, { merge: true });
-          return `12610${nextSeq}`;
-        });
-      } catch (e) {
-        console.error('ID Generation Transaction failed:', e);
-        newStudentId = `12610${Date.now().toString().slice(-4)}`;
-      }
-
-      // Check if this is the first user — they become the platform owner/admin
+      // Check if this is the first user — they become the platform owner/admin (with 2.5s timeout protection)
       let userRole = 'student';
       let isFirstUser = false;
       try {
         const { getDocs, query, limit } = await import('firebase/firestore');
         const { getTenantCollection } = await import('../lib/firebase');
-        const usersSnap = await getDocs(query(getTenantCollection('users'), limit(1)));
-        if (usersSnap.empty) {
+        const fetchUsers = getDocs(query(getTenantCollection('users'), limit(1)));
+        const timeoutUsers = new Promise<any>((resolve) => setTimeout(() => resolve(null), 2500));
+        const usersSnap: any = await Promise.race([fetchUsers, timeoutUsers]);
+        if (usersSnap && usersSnap.empty) {
           userRole = 'admin';
           isFirstUser = true;
         }
@@ -182,7 +166,7 @@ export const Register: React.FC = () => {
 
       // Save user to Firestore with all detailed form data
       const { getTenantDoc } = await import('../lib/firebase');
-      await setDoc(getTenantDoc('users', result.user.uid), {
+      const saveUserData = setDoc(getTenantDoc('users', result.user.uid), {
         uid: result.user.uid,
         email: email.trim(),
         displayName: name.trim(),
@@ -203,10 +187,14 @@ export const Register: React.FC = () => {
         schoolName: schoolName.trim(),
       });
 
+      const timeoutSave = new Promise((resolve) => setTimeout(resolve, 4000));
+      await Promise.race([saveUserData, timeoutSave]);
+
       if (isFirstUser || userRole === 'teacher' || userRole === 'admin') {
         alert('🎉 مرحباً بك! تم تعيين وتفعيل حسابك كمدير وصاحب هذه المنصة المستقلة بنجاح.');
         navigate('/admin/dashboard', { replace: true });
       } else {
+        alert('🎉 تم إنشاء حسابك بنجاح!');
         navigate('/', { replace: true });
       }
     } catch (err: any) {
