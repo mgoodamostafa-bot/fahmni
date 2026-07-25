@@ -192,10 +192,10 @@ export const Register: React.FC = () => {
 
       if (isFirstUser || userRole === 'teacher' || userRole === 'admin') {
         alert('🎉 مرحباً بك! تم تعيين وتفعيل حسابك كمدير وصاحب هذه المنصة المستقلة بنجاح.');
-        navigate('/admin/dashboard', { replace: true });
+        window.location.href = '/admin/dashboard';
       } else {
         alert('🎉 تم إنشاء حسابك بنجاح!');
-        navigate('/', { replace: true });
+        window.location.href = '/';
       }
     } catch (err: any) {
       console.error('Registration Error:', err);

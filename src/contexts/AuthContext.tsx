@@ -192,25 +192,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           addLog(`getDoc completed. Document exists: ${s.exists()}`);
 
           const isRegistering = sessionStorage.getItem('is_registering') === 'true';
-           if (!s.exists()) {
-            addLog(`Document missing. isRegistering state: ${isRegistering}`);
-            if (!isRegistering) {
-              addLog("Profile document missing. Signing out immediately...");
-              try {
-                await signOut(currentAuth);
-              } catch (signErr) {
-                console.error("Sign out error:", signErr);
-              }
-              setUser(null);
-              setProfile(null);
-              setLoading(false);
-              clearTimeout(forceUnfreeze);
-              return;
-            } else {
-               addLog("User is actively registering. Deferring UI unblock until document is created via onSnapshot...");
-            }
-          }
-
           const docData = s.exists() ? s.data() : {};
           const r = getResolvedRole(u.email, docData.role);
           const ownerFlag = checkIsOwner(docData, r);
@@ -232,28 +213,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             isOwner: ownerFlag,
           } as UserProfile;
 
+          setProfile(p);
+          setLoading(false);
+          clearTimeout(forceUnfreeze);
+
+          // Always listen to live document updates
+          unsub = onSnapshot(docRef, (snap) => {
+            addLog("onSnapshot update received for user profile");
+            if (snap.exists()) {
+              const updated = snap.data();
+              let updatedLevel = updated.level;
+              if (updatedLevel === 'preparatory') updatedLevel = 'prep';
+              setProfile({
+                ...updated,
+                level: updatedLevel,
+                uid: u.uid,
+                email: u.email || '',
+                role: getResolvedRole(u.email, updated.role),
+                isOwner: checkIsOwner(updated, getResolvedRole(u.email, updated.role))
+              } as UserProfile);
+            }
+          }, (err) => {
+            addLog(`❌ onSnapshot Profile error: ${err.message}`);
+          });
+
           if (r === 'admin' || r === 'teacher') {
-            addLog("User is admin/teacher. Setting profile, disabling loader, and listening to updates...");
-            setProfile(p);
-            setLoading(false);
-            clearTimeout(forceUnfreeze);
-            unsub = onSnapshot(docRef, (snap) => {
-              addLog("onSnapshot update received for admin/teacher user profile");
-              if (snap.exists()) {
-                const updated = snap.data();
-                setProfile({
-                  ...updated,
-                  uid: u.uid,
-                  email: u.email || '',
-                  role: getResolvedRole(u.email, updated.role),
-                } as UserProfile);
-              } else {
-                addLog("onSnapshot: profile document deleted! Reloading page...");
-                window.location.reload();
-              }
-            }, (err) => {
-              addLog(`❌ onSnapshot Admin Profile error: ${err.message}`);
-            });
             return;
           }
 

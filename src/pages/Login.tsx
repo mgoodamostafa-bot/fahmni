@@ -135,6 +135,15 @@ export const Login: React.FC = () => {
         const { signOut } = await import('firebase/auth');
         await signOut(getTenantAuth());
         setError('البريد الإلكتروني غير مسجل بالمنصة.');
+        setLoading(false);
+        return;
+      }
+
+      const userData = s.data();
+      if (userData?.role === 'admin' || userData?.role === 'teacher' || userData?.isOwner) {
+        navigate('/admin/dashboard', { replace: true });
+      } else {
+        navigate('/', { replace: true });
       }
     } catch (err: any) {
       if (
