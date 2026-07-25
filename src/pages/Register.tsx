@@ -142,23 +142,34 @@ export const Register: React.FC = () => {
       // 🆔 Instant Reliable Student ID Generation (never blocks UI)
       const newStudentId = `12610${Date.now().toString().slice(-4)}${Math.floor(10 + Math.random() * 90)}`;
 
-      // Check if this is the first user — they become the platform owner/admin (with 2.5s timeout protection)
+      // Check if this is the first user on this standalone platform — they become the platform owner/admin
       let userRole = 'student';
       let isFirstUser = false;
       try {
-        const { getDocs, query, limit } = await import('firebase/firestore');
-        const { getTenantCollection } = await import('../lib/firebase');
-        const fetchUsers = getDocs(query(getTenantCollection('users'), limit(1)));
-        const timeoutUsers = new Promise<any>((resolve) => setTimeout(() => resolve(null), 2500));
-        const usersSnap: any = await Promise.race([fetchUsers, timeoutUsers]);
-        if (usersSnap && usersSnap.empty) {
-          userRole = 'admin';
-          isFirstUser = true;
+        const { getDocs, query, where, limit } = await import('firebase/firestore');
+        const { getTenantCollection, isMasterHost } = await import('../lib/firebase');
+        
+        const isMaster = isMasterHost();
+        if (!isMaster) {
+          // On standalone/sub-tenant platforms, check if an admin already exists
+          const adminSnap = await getDocs(query(getTenantCollection('users'), where('role', '==', 'admin'), limit(1)));
+          if (adminSnap.empty) {
+            userRole = 'admin';
+            isFirstUser = true;
+          }
+        } else {
+          const fetchUsers = getDocs(query(getTenantCollection('users'), limit(1)));
+          const timeoutUsers = new Promise<any>((resolve) => setTimeout(() => resolve(null), 2500));
+          const usersSnap: any = await Promise.race([fetchUsers, timeoutUsers]);
+          if (usersSnap && usersSnap.empty) {
+            userRole = 'admin';
+            isFirstUser = true;
+          }
         }
       } catch (checkErr) {
         console.warn('Could not check for existing users, fallback check for standalone.', checkErr);
-        const isStandalone = (window as any).VITE_STANDALONE_MODE === 'true' || import.meta.env.VITE_STANDALONE_MODE === 'true';
-        if (isStandalone) {
+        const { isMasterHost } = await import('../lib/firebase');
+        if (!isMasterHost()) {
           userRole = 'admin';
           isFirstUser = true;
         }
