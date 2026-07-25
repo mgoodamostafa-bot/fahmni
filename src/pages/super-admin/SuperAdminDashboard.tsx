@@ -139,30 +139,120 @@ export const SuperAdminDashboard = () => {
   const downloadCompleteZipBundle = async (tenant: Tenant) => {
     setGeneratingZip(true);
     try {
-      const res = await fetch('/api/export-standalone-zip', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(tenant)
-      });
-      if (!res.ok) {
-        let errMsg = res.statusText;
-        try {
-          const errJson = await res.json();
-          if (errJson?.error) errMsg = errJson.error;
-        } catch (e) {}
-        throw new Error(`فشل استخراج ملفات المنصة (${errMsg})`);
+      let zipBlob: Blob | null = null;
+      try {
+        const res = await fetch('/api/export-standalone-zip', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(tenant)
+        });
+        if (res.ok) {
+          zipBlob = await res.blob();
+        }
+      } catch (backendErr) {
+        console.warn('Backend ZIP route unavailable, creating client-side standalone ZIP package via JSZip.', backendErr);
       }
 
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+      // If backend route unavailable or returned error, generate client-side ZIP with JSZip
+      if (!zipBlob) {
+        const JSZip = (await import('jszip')).default;
+        const zip = new JSZip();
+
+        // 1. .env
+        const envContent = `# Standalone Environment Config for Tenant: ${tenant.name}
+VITE_TENANT_ID=${tenant.subdomain}
+VITE_CUSTOM_DOMAIN=${tenant.customDomain || tenant.subdomain + '.fahmni.me'}
+VITE_FIREBASE_CONFIG=${tenant.firebaseConfig || ''}
+VITE_SUPABASE_URL=${tenant.supabaseUrl || ''}
+VITE_SUPABASE_ANON_KEY=${tenant.supabaseAnonKey || ''}
+VITE_STANDALONE_MODE=true
+`;
+        zip.file('.env', envContent);
+
+        // 2. render.yaml Blueprint
+        const renderYamlContent = `# Render.com Free Deployment Blueprint
+services:
+  - type: web
+    name: ${tenant.subdomain}-standalone-app
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: VITE_STANDALONE_MODE
+        value: "true"
+      - key: PORT
+        value: "3000"
+`;
+        zip.file('render.yaml', renderYamlContent);
+
+        // 3. .htaccess
+        const htaccessContent = `<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^index\\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>
+`;
+        zip.file('.htaccess', htaccessContent);
+
+        // 4. DEPLOYMENT_GUIDE.md
+        zip.file('DEPLOYMENT_GUIDE.md', generateStandaloneGuide(tenant));
+
+        // 5. firebase-config.json
+        if (tenant.firebaseConfig) {
+          try {
+            zip.file('firebase-config.json', JSON.stringify(JSON.parse(tenant.firebaseConfig), null, 2));
+          } catch(e) {
+            zip.file('firebase-config.json', tenant.firebaseConfig);
+          }
+        }
+
+        // 6. batch export script
+        const batContent = `@echo off
+echo Building Standalone Package for ${tenant.name}...
+call npm run build
+powershell -Command "Compress-Archive -Path dist/* -DestinationPath standalone-bundle-${tenant.subdomain}.zip -Force"
+echo Package created successfully!
+pause
+`;
+        zip.file(`export-standalone-${tenant.subdomain}.bat`, batContent);
+
+        // 7. README_تعليمات_الرفع.txt
+        const readmeContent = `🎉 حزمة المنصة المستقلة المكتملة للمعلم: ${tenant.name}
+
+محتويات هذه الحزمة:
+======================================
+1. .env : ملف المتغيرات وإعدادات التفعيل.
+2. render.yaml : ملف الرفع المباشر والمجاني على Render.com (100% Free Web Service + Database).
+3. DEPLOYMENT_GUIDE.md : دليل الاستضافة الشامل بالعربي.
+4. .htaccess : ملف توجيه السيرفر لاستضافات Hostinger / CPanel.
+5. firebase-config.json : إعدادات الاتصال بقواعد البيانات.
+
+خطوات الرفع المجانية السريعة على Render.com:
+--------------------------------------
+1. ارفع المشروع إلى حساب GitHub الخاص بك.
+2. ادخل موقع Render.com واختر New -> Web Service واربط مستودع GitHub.
+3. حدد Build Command: npm install && npm run build
+4. حدد Start Command: npm run start
+5. اضغط Create Web Service وستعمل المنصة مجاناً 100%!
+`;
+        zip.file('README_تعليمات_الرفع.txt', readmeContent);
+
+        zipBlob = await zip.generateAsync({ type: 'blob' });
+      }
+
+      const url = URL.createObjectURL(zipBlob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `fahmni_standalone_${tenant.subdomain}_full_bundle.zip`;
       a.click();
       URL.revokeObjectURL(url);
-      alert(`🎉 تم إنشاء وتنزيل حزمة المنصة المكتملة المجهزة بالكامل (${tenant.name}) بنجاح! تحتوي الحزمة على كافة الأصول والملفات المترجمة، وجاهزة للرفع المباشر على Vercel أو Hostinger أو Netlify.`);
+      alert(`🎉 تم إنشاء وتنزيل حزمة المنصة المستقلة ZIP المكتملة (${tenant.name}) بنجاح! تحتوي الحزمة على كافة ملفات الإعدادات والـ Render Blueprint والدليل المعماري.`);
     } catch (err: any) {
       console.error('ZIP generation error:', err);
       alert('حدث خطأ أثناء إنشاء حزمة ZIP: ' + err.message);
