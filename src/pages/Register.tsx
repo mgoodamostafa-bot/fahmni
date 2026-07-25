@@ -211,7 +211,29 @@ export const Register: React.FC = () => {
     } catch (err: any) {
       console.error('Registration Error:', err);
       if (err.code === 'auth/email-already-in-use') {
-        setError('هذا البريد الإلكتروني مستخدم بالفعل. حاول تسجيل الدخول.');
+        // 🔄 Automatic Seamless Fallback: Sign in existing Auth user and redirect to dashboard
+        try {
+          const { signInWithEmailAndPassword } = await import('firebase/auth');
+          const { getTenantAuth, getTenantDoc } = await import('../lib/firebase');
+          const { getDoc } = await import('firebase/firestore');
+
+          const loginRes = await signInWithEmailAndPassword(getTenantAuth(), email, password);
+          if (loginRes && loginRes.user) {
+            const uSnap = await getDoc(getTenantDoc('users', loginRes.user.uid));
+            const uData = uSnap.data();
+            if (uData?.role === 'admin' || uData?.role === 'teacher' || uData?.isOwner) {
+              alert('🎉 مرحباً بك! تم تسجيل دخولك وتفعيل حسابك كمدير لهذه المنصة بنجاح.');
+              window.location.href = '/admin/dashboard';
+            } else {
+              alert('🎉 مرحباً بك مجدداً! تم تسجيل دخولك بنجاح.');
+              window.location.href = '/';
+            }
+            return;
+          }
+        } catch (autoLoginErr: any) {
+          console.warn('Auto login failed:', autoLoginErr);
+        }
+        setError('هذا البريد الإلكتروني مسجل من قبل بكلمة مرور مختلفة. اضغط على (تسجيل الدخول) أو جرب بريد آخر.');
       } else if (err.code === 'auth/weak-password') {
         setError('كلمة المرور ضعيفة جداً. يجب أن تكون 6 أحرف على الأقل.');
       } else if (err.code === 'auth/invalid-email') {
