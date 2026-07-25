@@ -63,7 +63,9 @@ export const LocalDbDriver = {
     try {
       const res = await fetch(`/api/local-db/${String(collectionName)}`);
       if (!res.ok) return [];
-      const data = await res.json();
+      const text = await res.text();
+      if (!text || !text.trim()) return [];
+      const data = JSON.parse(text);
       return data.items || [];
     } catch (e) {
       console.warn(`LocalDbDriver fetch failed for ${String(collectionName)}`, e);

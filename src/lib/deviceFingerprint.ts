@@ -28,8 +28,11 @@ export const getPublicIP = async (timeoutMs: number = 3000): Promise<string> => 
       signal: controller.signal,
     });
     clearTimeout(id);
-    const data = await response.json();
-    return data.ip;
+    if (!response.ok) return 'unknown-ip';
+    const text = await response.text();
+    if (!text || !text.trim()) return 'unknown-ip';
+    const data = JSON.parse(text);
+    return data.ip || 'unknown-ip';
   } catch (error) {
     console.warn('IP lookup timed out or failed, using local fallback:', error);
     return 'unknown-ip';
