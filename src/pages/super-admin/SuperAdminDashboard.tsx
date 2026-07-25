@@ -304,7 +304,31 @@ VITE_STANDALONE_MODE=true
 
 ## 📌 الخطوة 2: الخيارات المتاحة للاستضافة (Deployment Options)
 
-### 1️⃣ الاستضافة على Hostinger / CPanel (استضافة مشتركة)
+### 🟢 1️⃣ الاستضافة المجانية 100% على Render.com (سيرفر + داتا بيز مجانية - بدون فواتير فايربيس!)
+> **المميزات:** توفر استضافة Node.js كاملة مجاناً مع قاعدة بيانات محليّة أو PostgreSQL بدون أي تكاليف شهرية أو مصاريف فايربيس!
+
+1. ارفع المشروع إلى حساب GitHub الخاص بك.
+2. اذهب إلى [Render.com](https://render.com) واضغط **New +** ⬅️ **Web Service**.
+3. اختر المستودع الخاص بالمنصة على GitHub.
+4. املأ البيانات كالتالي:
+   - **Environment:** Node
+   - **Build Command:** \`npm install && npm run build\`
+   - **Start Command:** \`npm run start\`
+   - **Plan:** Free
+5. أضف ملف المتغيرات \`.env\` أو أضف \`VITE_STANDALONE_MODE=true\`.
+6. اضغط **Create Web Service** وسيعمل السيرفر والقاعدة مجاناً 100%!
+
+---
+
+### 🔵 2️⃣ الاستضافة السحابية على Vercel / Netlify
+1. قم برفع كود المشروع على حساب GitHub الخاص بك.
+2. افتح [Vercel](https://vercel.com) أو [Netlify](https://netlify.com) واختيار **Import Project**.
+3. أضف المتغيرات الموجودة بملف \`.env\` في قسم **Environment Variables**.
+4. اضغط **Deploy** وسيتم تشغيل المنصة في ثوانٍ!
+
+---
+
+### 🟢 3️⃣ الاستضافة على Hostinger / CPanel (استضافة سيرفر خاص VPS)
 1. قم بتشغيل الأمر \`npm run build\` على جهازك لتوليد مجلد الإنتاج \`dist\`.
 2. قم بضغط محتويات مجلد \`dist\` في ملف ZIP.
 3. افتح لوحة تحكم CPanel أو Hostinger واذهب إلى **File Manager -> public_html**.
@@ -324,34 +348,7 @@ VITE_STANDALONE_MODE=true
 
 ---
 
-### 2️⃣ الاستضافة المجانية أو السحابية على Vercel / Netlify / Cloudflare Pages
-1. قم برفع كود المشروع على حساب GitHub الخاص بك.
-2. افتح [Vercel](https://vercel.com) أو [Netlify](https://netlify.com) واختيار **Import Project**.
-3. أضف المتغيرات الموجودة بملف \`.env\` في قسم **Environment Variables**.
-4. اضغط **Deploy** وسيتم تشغيل المنصة في ثوانٍ!
-
----
-
-### 3️⃣ الاستضافة على سيرفر خاص (VPS / Nginx)
-1. ثبت Node.js و Nginx على السيرفر.
-2. قم بعمل \`npm run build\` ثم تشغيل سيرفر المعاينة بواسطة Nginx:
-
-\`\`\`nginx
-server {
-    listen 80;
-    server_name ${tenant.customDomain || tenant.subdomain + '.fahmni.me'};
-
-    location / {
-        root /var/www/fahmni/dist;
-        index index.html;
-        try_files $uri $uri/ /index.html;
-    }
-}
-\`\`\`
-
----
-
-🎉 **تهانينا! منصة ${tenant.name} الآن تعمل بحريّة كاملة وعلى استضافتك الخاصة!**
+🎉 **تهانينا! منصة ${tenant.name} الآن تعمل بحريّة كاملة ومجانية 100% بدون أي فواتير!**
 `;
   };
 

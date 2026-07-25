@@ -1,0 +1,19 @@
+# =======================================================
+# Render.com Blueprint Blueprint for Standalone Deployment
+# 100% Free Web Service + SQLite / PostgreSQL Support
+# =======================================================
+
+services:
+  - type: web
+    name: fahmni-standalone-app
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: VITE_STANDALONE_MODE
+        value: "true"
+      - key: NODE_ENV
+        value: "production"
+      - key: PORT
+        value: "3000"
