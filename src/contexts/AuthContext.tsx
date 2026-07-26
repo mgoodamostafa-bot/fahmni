@@ -87,7 +87,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     addLog("Logging out...");
-    await signOut(getTenantAuth());
+    localStorage.removeItem('fahmni_sqlite_user');
+    sessionStorage.clear();
+    setUser(null);
+    setProfile(null);
+    try {
+      const currentAuth = getTenantAuth();
+      if (currentAuth) await signOut(currentAuth);
+    } catch (e) {}
+    window.location.href = '/login';
   };
 
   const forceRefreshProfile = async () => {

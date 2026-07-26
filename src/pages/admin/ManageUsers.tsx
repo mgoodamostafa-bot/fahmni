@@ -369,10 +369,32 @@ export const ManageUsers: React.FC = () => {
   const [newDefaultCommission, setNewDefaultCommission] = useState<number>(100);
   const [updatingCommission, setUpdatingCommission] = useState(false);
 
-  // ── Fetch Users (using getDocs for better performance instead of onSnapshot) ──
+  // ── Fetch Users ──
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
+      const { LocalDbDriver } = await import('../../lib/sqliteDriver');
+      if (LocalDbDriver.isSelfHosted()) {
+        const localUsers = await LocalDbDriver.getCollection('users');
+        const standaloneUsersStr = localStorage.getItem('fahmni_standalone_users');
+        let combined = Array.isArray(localUsers) ? [...localUsers] : [];
+        if (standaloneUsersStr) {
+          try {
+            const standaloneList = JSON.parse(standaloneUsersStr);
+            if (Array.isArray(standaloneList)) {
+              for (const su of standaloneList) {
+                if (!combined.some(u => (u.uid && u.uid === su.uid) || (u.id && u.id === su.uid) || (u.email && u.email === su.email))) {
+                  combined.push(su);
+                }
+              }
+            }
+          } catch (e) {}
+        }
+        setUsers(combined);
+        setLoading(false);
+        return;
+      }
+
       const snap = await getDocs(collection(db, 'users'));
       const all = snap.docs.map(
         (d) =>
