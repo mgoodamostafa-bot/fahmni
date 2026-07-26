@@ -1473,22 +1473,28 @@ VITE_STANDALONE_MODE=true
 
                           // 2. Delete from local registry cache / localStorage
                           try {
-                            const localTenantsRaw = localStorage.getItem('fahmni_master_tenants');
-                            if (localTenantsRaw) {
-                              const list = JSON.parse(localTenantsRaw);
-                              const updated = list.filter((t: any) => t.id !== docId && t.subdomain !== sub && t.subdomain !== tenant.subdomain);
-                              localStorage.setItem('fahmni_master_tenants', JSON.stringify(updated));
+                            for (const k of ['fahmni_master_tenants', 'fahmni_local_tenants']) {
+                              const localTenantsRaw = localStorage.getItem(k);
+                              if (localTenantsRaw) {
+                                const list = JSON.parse(localTenantsRaw);
+                                const updated = list.filter((t: any) => t.id !== docId && t.subdomain !== sub && t.subdomain !== tenant.subdomain);
+                                localStorage.setItem(k, JSON.stringify(updated));
+                              }
                             }
                           } catch (e) {}
 
                           // 3. Delete from backend local server file registry via API
                           try {
-                            await fetch(`/api/tenants/${sub || docId}`, { method: 'DELETE' });
+                            await fetch('/api/admin/delete-tenant', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ id: docId, subdomain: sub })
+                            });
                           } catch (e) {}
 
                           // 4. Immediately filter state UI
                           setTenants((prev) => prev.filter((t) => t.id !== docId && t.subdomain !== sub && t.subdomain !== tenant.subdomain));
-                          alert(`✅ تم حذف منصة ${tenant.name} بنجاح!`);
+                          alert(`✅ تم حذف منصة ${tenant.name} نهائياً وبنجاح!`);
                         } catch (err: any) {
                           console.error('Error deleting tenant:', err);
                           alert('حدث خطأ أثناء حذف المنصة: ' + err.message);

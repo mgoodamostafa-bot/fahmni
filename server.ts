@@ -1438,6 +1438,48 @@ VITE_TENANT_DATA='${JSON.stringify(fullTenantObj)}'
     }
   });
 
+  // API Endpoint - Delete Tenant (Server Registry + Admin DB)
+  app.post('/api/admin/delete-tenant', async (req, res) => {
+    try {
+      const { id, subdomain } = req.body || {};
+      const targetId = (subdomain || id || '').toLowerCase().trim();
+      if (!targetId) {
+        return res.status(400).json({ error: 'Missing tenant identifier' });
+      }
+
+      // 1. Delete from Firebase Admin DB if available
+      const adminDb = getAdminDb();
+      if (adminDb) {
+        try {
+          await adminDb.collection('tenants').doc(targetId).delete();
+          if (id && id !== targetId) {
+            await adminDb.collection('tenants').doc(id).delete();
+          }
+        } catch (e) {
+          console.warn('Admin DB tenant delete warning:', e);
+        }
+      }
+
+      // 2. Delete from local tenants registry file
+      await ensureBackupDir();
+      try {
+        const fileData = await fs.readFile(TENANTS_FILE, 'utf-8');
+        let registry: any[] = JSON.parse(fileData);
+        registry = registry.filter(t => 
+          (t.id || '').toLowerCase() !== targetId &&
+          (t.subdomain || '').toLowerCase() !== targetId &&
+          (!id || (t.id || '').toLowerCase() !== id.toLowerCase())
+        );
+        await fs.writeFile(TENANTS_FILE, JSON.stringify(registry, null, 2), 'utf-8');
+      } catch (e) {}
+
+      res.json({ success: true, deletedId: targetId });
+    } catch (err: any) {
+      console.error('Error deleting tenant via admin API:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // API Endpoint - List Tenants (Server Registry + Admin DB)
   app.get('/api/admin/list-tenants', async (req, res) => {
     try {

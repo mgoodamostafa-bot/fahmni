@@ -29,5 +29,31 @@
     "subject": "ماث",
     "vodafoneCashNumber": "01005813308",
     "updatedAt": "2026-07-25T22:37:58.430Z"
+  },
+  {
+    "id": "tenant-493614",
+    "name": "ب الحب ",
+    "subdomain": "tenant-493614",
+    "package": "الباقة الأساسية",
+    "firebaseConfig": "",
+    "loyaltySystem": false,
+    "customSubdomain": true,
+    "slogan": "عد إلى رحلتك التعليمية الممتعة",
+    "primaryColor": "#dcdf3a",
+    "fruitTheme": "",
+    "platformMode": "single",
+    "educationStage": "secondary",
+    "tiktok": "",
+    "hideMotherPhone": false,
+    "hideFatherPhone": false,
+    "hideSchoolName": false,
+    "heroTitle1": "مستقبلك قرار ...",
+    "heroTitle2": "تقفيل المادة معانا إجبار",
+    "heroTitle3": "مش اختيار 💪",
+    "heroDescription": "تعلم ببساطة مع أقوى الشروحات، الامتحانات التفاعلية، والمتابعة الدورية للوصول للدرجة النهائية.",
+    "createdAt": "2026-07-26T17:37:10.458Z",
+    "dbEngine": "sqlite",
+    "isStandalone": true,
+    "updatedAt": "2026-07-26T17:38:14.112Z"
   }
 ]
