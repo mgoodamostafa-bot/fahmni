@@ -197,6 +197,21 @@ export const AdminAddCourse: React.FC = () => {
         createdAt: serverTimestamp(),
       };
 
+      const { LocalDbDriver } = await import('../../lib/sqliteDriver');
+      if (LocalDbDriver.isSelfHosted()) {
+        const courseId = `course_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        await LocalDbDriver.saveItem('courses', {
+          id: courseId,
+          ...courseData,
+          createdAt: new Date().toISOString()
+        });
+        setSuccess(true);
+        setTimeout(() => {
+          navigate('/teacher/courses');
+        }, 1200);
+        return;
+      }
+
       await addDoc(collection(db, 'Courses'), courseData);
       setSuccess(true);
       setTimeout(() => {

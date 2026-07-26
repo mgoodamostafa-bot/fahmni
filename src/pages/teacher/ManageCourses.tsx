@@ -36,6 +36,14 @@ export const TeacherManageCourses: React.FC = () => {
   const fetchCourses = async () => {
     if (!user) return;
     try {
+      const { LocalDbDriver } = await import('../../lib/sqliteDriver');
+      if (LocalDbDriver.isSelfHosted()) {
+        const localCourses = await LocalDbDriver.getCollection('courses');
+        setCourses(localCourses);
+        setLoading(false);
+        return;
+      }
+
       const qUpper = query(collection(db, 'Courses'));
       const qLower = query(collection(db, 'courses'));
 
