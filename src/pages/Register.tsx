@@ -92,14 +92,17 @@ export const Register: React.FC = () => {
     sessionStorage.setItem('is_registering', 'true');
 
     try {
-      const isSqlEngine = (window as any).VITE_DB_TYPE === 'sqlite' || import.meta.env.VITE_DB_TYPE === 'sqlite' || (window as any).VITE_STANDALONE_MODE === 'true' || import.meta.env.VITE_STANDALONE_MODE === 'true';
-      if (isSqlEngine) {
+      const { isMasterHost } = await import('../lib/firebase');
+      const isStandalone = !isMasterHost() || (window as any).VITE_STANDALONE_MODE === 'true' || import.meta.env.VITE_STANDALONE_MODE === 'true' || (window as any).VITE_DB_TYPE === 'sqlite' || import.meta.env.VITE_DB_TYPE === 'sqlite';
+
+      if (isStandalone) {
+        // 1. Try Local REST API Auth (Render / Hostinger VPS / Node Server)
         try {
           const res = await fetch('/api/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              email,
+              email: email.trim(),
               password,
               displayName: name.trim(),
               studentPhone,
@@ -110,28 +113,80 @@ export const Register: React.FC = () => {
               level: stage
             })
           });
-          const text = await res.text();
-          let data: any = {};
-          try { data = JSON.parse(text); } catch (e) {}
-          if (res.ok && data.user) {
-            localStorage.setItem('fahmni_sqlite_user', JSON.stringify(data.user));
-            if (data.user.role === 'admin' || data.isFirstUser) {
-              alert('🎉 مرحباً بك! تم إنشاء المنصة المستقلة وحساب المدير بنجاح.');
-              navigate('/admin/dashboard', { replace: true });
-            } else {
-              alert('🎉 تم إنشاء حسابك بنجاح!');
-              navigate('/', { replace: true });
+          if (res.ok) {
+            const text = await res.text();
+            let data: any = {};
+            try { data = JSON.parse(text); } catch (e) {}
+            if (data.user) {
+              localStorage.setItem('fahmni_sqlite_user', JSON.stringify(data.user));
+              if (data.user.role === 'admin' || data.isFirstUser) {
+                alert('🎉 مرحباً بك! تم إنشاء المنصة المستقلة وحساب المدير بنجاح.');
+                window.location.href = '/admin/dashboard';
+              } else {
+                alert('🎉 تم إنشاء حسابك بنجاح!');
+                window.location.href = '/';
+              }
+              setLoading(false);
+              return;
             }
-            setLoading(false);
-            return;
           }
-          if (data.error) throw new Error(data.error);
         } catch (sqlErr: any) {
-          if ((window as any).VITE_DB_TYPE === 'sqlite') {
-            throw sqlErr;
-          }
-          console.warn('SQLite API endpoint unavailable, falling back to Firebase Auth registration.', sqlErr);
+          console.warn('Local REST API unavailable, performing domain-isolated standalone registration.', sqlErr);
         }
+
+        // 2. Client-Side Isolated Standalone Auth (for static deployments like Vercel / Netlify)
+        const localUsersKey = 'fahmni_standalone_users';
+        const existingUsers = JSON.parse(localStorage.getItem(localUsersKey) || '[]');
+        const isFirstUser = existingUsers.length === 0;
+        const userRole = isFirstUser ? 'admin' : 'student';
+        const newStudentId = `12610${Date.now().toString().slice(-4)}${Math.floor(10 + Math.random() * 90)}`;
+
+        const existingUserIndex = existingUsers.findIndex((u: any) => u.email.toLowerCase() === email.trim().toLowerCase());
+        if (existingUserIndex >= 0) {
+          const existingUser = existingUsers[existingUserIndex];
+          localStorage.setItem('fahmni_sqlite_user', JSON.stringify(existingUser));
+          if (existingUser.role === 'admin' || existingUser.isOwner) {
+            alert('🎉 مرحباً بك مجدداً! تم تسجيل دخولك كمدير لهذه المنصة.');
+            window.location.href = '/admin/dashboard';
+          } else {
+            alert('🎉 مرحباً بك مجدداً!');
+            window.location.href = '/';
+          }
+          setLoading(false);
+          return;
+        }
+
+        const newUser = {
+          uid: `user_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          email: email.trim(),
+          displayName: name.trim(),
+          role: userRole,
+          isOwner: isFirstUser,
+          studentId: newStudentId,
+          level: stage,
+          grade: grade,
+          studentPhone: studentPhone.trim(),
+          motherPhone: motherPhone.trim(),
+          fatherPhone: fatherPhone.trim(),
+          schoolName: schoolName.trim(),
+          createdAt: new Date().toISOString(),
+          balance: 0,
+          walletBalance: 0
+        };
+
+        existingUsers.push(newUser);
+        localStorage.setItem(localUsersKey, JSON.stringify(existingUsers));
+        localStorage.setItem('fahmni_sqlite_user', JSON.stringify(newUser));
+
+        if (isFirstUser || userRole === 'admin') {
+          alert('🎉 مرحباً بك! تم تفعيل وتعيين حسابك كمدير وصاحب هذه المنصة المستقلة بنجاح.');
+          window.location.href = '/admin/dashboard';
+        } else {
+          alert('🎉 تم إنشاء حسابك بنجاح!');
+          window.location.href = '/';
+        }
+        setLoading(false);
+        return;
       }
 
       const result = await createUserWithEmailAndPassword(getTenantAuth(), email, password);

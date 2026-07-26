@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
 import { User, onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
-import { getTenantAuth, getTenantDb, getTenantDoc } from '../lib/firebase';
+import { getTenantAuth, getTenantDb, getTenantDoc, isMasterHost } from '../lib/firebase';
 import { useTenant } from './TenantContext';
 
 interface UserProfile {
@@ -149,8 +149,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setProfileHanging(true);
     }, 12000);
 
-    const isSqlEngine = (window as any).VITE_DB_TYPE === 'sqlite' || import.meta.env.VITE_DB_TYPE === 'sqlite' || (window as any).VITE_STANDALONE_MODE === 'true' || import.meta.env.VITE_STANDALONE_MODE === 'true';
-    if (isSqlEngine) {
+    const isStandalone = !isMasterHost() || (window as any).VITE_STANDALONE_MODE === 'true' || import.meta.env.VITE_STANDALONE_MODE === 'true' || (window as any).VITE_DB_TYPE === 'sqlite' || import.meta.env.VITE_DB_TYPE === 'sqlite';
+    if (isStandalone) {
       const savedUserStr = localStorage.getItem('fahmni_sqlite_user');
       if (savedUserStr) {
         try {

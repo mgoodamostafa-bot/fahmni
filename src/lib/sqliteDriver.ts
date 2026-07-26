@@ -55,8 +55,13 @@ export function createInitialLocalSchema(): LocalDbSchema {
  */
 export const LocalDbDriver = {
   isSelfHosted(): boolean {
-    return (import.meta.env.VITE_DB_TYPE as string)?.toLowerCase() === 'sqlite' ||
-           (import.meta.env.VITE_STANDALONE_MODE as string) === 'true';
+    if (typeof window === 'undefined') return false;
+    const host = window.location.hostname;
+    const isExplicitStandalone = (window as any).VITE_STANDALONE_MODE === 'true' || (import.meta.env.VITE_STANDALONE_MODE as string) === 'true';
+    if (isExplicitStandalone) return true;
+
+    const isMaster = host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost') || host === 'fahmni.me' || host.endsWith('.fahmni.me');
+    return !isMaster || (import.meta.env.VITE_DB_TYPE as string)?.toLowerCase() === 'sqlite';
   },
 
   async getCollection(collectionName: keyof LocalDbSchema): Promise<any[]> {

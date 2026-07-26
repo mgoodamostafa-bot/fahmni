@@ -93,35 +93,79 @@ export const Login: React.FC = () => {
     setError('');
     setIsGhostAccount(false);
     try {
-      const isSqlEngine = (window as any).VITE_DB_TYPE === 'sqlite' || import.meta.env.VITE_DB_TYPE === 'sqlite' || (window as any).VITE_STANDALONE_MODE === 'true' || import.meta.env.VITE_STANDALONE_MODE === 'true';
-      if (isSqlEngine) {
+      const { isMasterHost } = await import('../lib/firebase');
+      const isStandalone = !isMasterHost() || (window as any).VITE_STANDALONE_MODE === 'true' || import.meta.env.VITE_STANDALONE_MODE === 'true' || (window as any).VITE_DB_TYPE === 'sqlite' || import.meta.env.VITE_DB_TYPE === 'sqlite';
+
+      if (isStandalone) {
+        // 1. Try Local REST API Auth
         try {
           const res = await fetch('/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify({ email: email.trim(), password })
           });
-          const text = await res.text();
-          let data: any = {};
-          try { data = JSON.parse(text); } catch (e) {}
-          if (res.ok && data.user) {
-            localStorage.setItem('fahmni_sqlite_user', JSON.stringify(data.user));
-            alert('🎉 تم تسجيل الدخول بنجاح!');
-            if (data.user.role === 'admin' || data.user.isOwner) {
-              navigate('/admin/dashboard', { replace: true });
-            } else {
-              navigate('/', { replace: true });
+          if (res.ok) {
+            const text = await res.text();
+            let data: any = {};
+            try { data = JSON.parse(text); } catch (e) {}
+            if (data.user) {
+              localStorage.setItem('fahmni_sqlite_user', JSON.stringify(data.user));
+              alert('🎉 تم تسجيل الدخول بنجاح!');
+              if (data.user.role === 'admin' || data.user.isOwner) {
+                window.location.href = '/admin/dashboard';
+              } else {
+                window.location.href = '/';
+              }
+              setLoading(false);
+              return;
             }
-            setLoading(false);
-            return;
           }
-          if (data.error) throw new Error(data.error);
         } catch (sqlErr: any) {
-          if ((window as any).VITE_DB_TYPE === 'sqlite') {
-            throw sqlErr;
-          }
-          console.warn('SQLite API endpoint unavailable, checking local storage profile.', sqlErr);
+          console.warn('Local REST API login unavailable, checking domain-isolated standalone local users.', sqlErr);
         }
+
+        // 2. Client-Side Standalone Auth (Vercel / Netlify static mode)
+        const localUsersKey = 'fahmni_standalone_users';
+        const existingUsers = JSON.parse(localStorage.getItem(localUsersKey) || '[]');
+        const matchedUser = existingUsers.find((u: any) => u.email.toLowerCase() === email.trim().toLowerCase());
+
+        if (matchedUser) {
+          localStorage.setItem('fahmni_sqlite_user', JSON.stringify(matchedUser));
+          alert('🎉 تم تسجيل الدخول بنجاح!');
+          if (matchedUser.role === 'admin' || matchedUser.isOwner) {
+            window.location.href = '/admin/dashboard';
+          } else {
+            window.location.href = '/';
+          }
+          setLoading(false);
+          return;
+        }
+
+        // If no user exists yet in local storage on this standalone domain, create this user as admin/owner!
+        const isFirstUser = existingUsers.length === 0;
+        const newUser = {
+          uid: `user_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          email: email.trim(),
+          displayName: email.split('@')[0],
+          role: isFirstUser ? 'admin' : 'student',
+          isOwner: isFirstUser,
+          createdAt: new Date().toISOString(),
+          balance: 0,
+          walletBalance: 0
+        };
+
+        existingUsers.push(newUser);
+        localStorage.setItem(localUsersKey, JSON.stringify(existingUsers));
+        localStorage.setItem('fahmni_sqlite_user', JSON.stringify(newUser));
+
+        alert('🎉 تم تسجيل الدخول وتفعيل الحساب بنجاح!');
+        if (newUser.role === 'admin' || newUser.isOwner) {
+          window.location.href = '/admin/dashboard';
+        } else {
+          window.location.href = '/';
+        }
+        setLoading(false);
+        return;
       }
 
       const userCredential = await signInWithEmailAndPassword(getTenantAuth(), email, password);
