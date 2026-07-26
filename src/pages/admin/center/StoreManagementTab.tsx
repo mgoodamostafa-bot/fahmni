@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+﻿import React, { useState, useEffect } from 'react';
+import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, serverTimestamp } from '../../../lib/dbRouter';
 import { getTenantDb } from '../../../lib/firebase';
 import { isSupabaseConfigured, supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../contexts/AuthContext';

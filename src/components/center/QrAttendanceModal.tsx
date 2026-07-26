@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+﻿import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import {
   QrCode,
@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { Student } from '../../hooks/useCenterData';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
-import { setDoc, doc } from 'firebase/firestore';
+import { setDoc, doc } from '../../lib/dbRouter';
 import { db } from '../../lib/firebase';
 import { dbRouter } from '../../services/dbRouter';
 

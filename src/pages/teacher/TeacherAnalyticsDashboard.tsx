@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, limit } from 'firebase/firestore';
+﻿import React, { useState, useEffect } from 'react';
+import { collection, getDocs, query, where, limit } from '../../lib/dbRouter';
 import { getTenantDb } from '../../lib/firebase';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { motion } from 'framer-motion';

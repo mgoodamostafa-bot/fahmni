@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
   collection,
   getDocs,
@@ -8,7 +8,7 @@ import {
   doc,
   query,
   where,
-} from 'firebase/firestore';
+} from '../../lib/dbRouter';
 import { db } from '../../lib/firebase';
 import { Plus, Trash2, ArrowLeft, Save, CheckCircle2, AlertCircle, HelpCircle } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';

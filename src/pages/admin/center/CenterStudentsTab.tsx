@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   Search,
   UserPlus,
@@ -21,7 +21,7 @@ import { dbRouter } from '../../../services/dbRouter';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { db } from '../../../lib/firebase';
 import { isSupabaseConfigured, supabase } from '../../../lib/supabase';
-import { collection, getDocs, setDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, setDoc, doc, serverTimestamp } from '../../../lib/dbRouter';
 import { cleanPhone, getGradeLabel, arabicToEnglishNumbers } from '../../../utils/arabicUtils';
 import { studentCardService } from '../../../services/studentCardService';
 import { CenterStudentProfileModal } from './CenterStudentProfileModal';

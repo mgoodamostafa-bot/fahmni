@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   collection,
   getDocs,
@@ -10,7 +10,7 @@ import {
   serverTimestamp,
   query,
   where,
-} from 'firebase/firestore';
+} from '../../lib/dbRouter';
 import { db } from '../../lib/firebase';
 import {
   Users,

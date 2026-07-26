@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { BookOpen, User, LogOut, Menu, X, FileText } from 'lucide-react';
 import { getTenantAuth, getTenantDb } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from '../lib/dbRouter';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useTenant } from '../contexts/TenantContext';

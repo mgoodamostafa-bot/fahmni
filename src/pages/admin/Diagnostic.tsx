@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { collection, getDocs, doc, setDoc, query, where, getDoc } from 'firebase/firestore';
+﻿import React, { useState } from 'react';
+import { collection, getDocs, doc, setDoc, query, where, getDoc } from '../../lib/dbRouter';
 import { getTenantAuth, getTenantDb } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import {

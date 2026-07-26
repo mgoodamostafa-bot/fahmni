@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   collection,
   query,
@@ -9,7 +9,7 @@ import {
   deleteDoc,
   serverTimestamp,
   updateDoc,
-} from 'firebase/firestore';
+} from '../../../lib/dbRouter';
 import { db } from '../../../lib/firebase';
 import { isSupabaseConfigured, supabase } from '../../../lib/supabase';
 import { dbRouter } from '../../../services/dbRouter';

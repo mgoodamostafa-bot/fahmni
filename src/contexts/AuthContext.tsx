@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
+﻿import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
 import { User, onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, onSnapshot, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc } from '../lib/dbRouter';
 import { getTenantAuth, getTenantDb, getTenantDoc, isMasterHost } from '../lib/firebase';
 import { useTenant } from './TenantContext';
 

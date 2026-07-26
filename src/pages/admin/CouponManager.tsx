@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   collection,
@@ -11,7 +11,7 @@ import {
   deleteDoc,
   where,
   updateDoc,
-} from 'firebase/firestore';
+} from '../../lib/dbRouter';
 import { getTenantDb } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import {

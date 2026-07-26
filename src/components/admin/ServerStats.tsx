@@ -10,7 +10,7 @@ import {
   deleteDoc,
   doc,
   Timestamp,
-} from 'firebase/firestore';
+} from '../../lib/dbRouter';
 import { db } from '../../lib/firebase';
 
 export const ServerStats: React.FC = () => {

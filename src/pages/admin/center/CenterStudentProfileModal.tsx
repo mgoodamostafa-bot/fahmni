@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   X,
   User,
@@ -13,7 +13,7 @@ import {
   MessageCircle,
   TrendingUp,
 } from 'lucide-react';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs } from '../../../lib/dbRouter';
 import { db } from '../../../lib/firebase';
 import { isSupabaseConfigured, supabase } from '../../../lib/supabase';
 import { Center, Group, Student } from '../../../hooks/useCenterData';

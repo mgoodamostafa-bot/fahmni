@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+﻿import React, { useEffect, useState, useRef } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import {
   collection,
@@ -8,7 +8,7 @@ import {
   setDoc,
   doc,
   serverTimestamp,
-} from 'firebase/firestore';
+} from '../../lib/dbRouter';
 import { db } from '../../lib/firebase';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { dbRouter } from '../../services/dbRouter';

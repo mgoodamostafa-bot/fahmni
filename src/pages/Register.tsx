@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { BookOpen, Facebook, Youtube, ShieldAlert, Award, User, Phone, Book, Mail, Lock, Sparkles, Send } from 'lucide-react';
 import { getTenantAuth, getTenantDb } from '../lib/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, runTransaction } from '../lib/dbRouter';
 import { useAuth } from '../contexts/AuthContext';
 import { useTenant } from '../contexts/TenantContext';
 import { useSettings } from '../contexts/SettingsContext';

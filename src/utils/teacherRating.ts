@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Teacher Rating System
  * Provides functionality for rating and reviewing teachers
  */
@@ -14,7 +14,7 @@ import {
   where,
   orderBy,
   serverTimestamp,
-} from 'firebase/firestore';
+} from '../lib/dbRouter';
 import { db } from '../lib/firebase';
 
 export interface TeacherRating {

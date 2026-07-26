@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
+﻿import React, { useEffect, useState } from 'react';
+import { doc, getDoc, setDoc, collection, getDocs } from '../../lib/dbRouter';
 import { db, masterDb } from '../../lib/firebase';
 import {
   Settings,

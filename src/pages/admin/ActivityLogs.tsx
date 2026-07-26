@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+﻿import React, { useEffect, useState } from 'react';
+import { collection, query, orderBy, onSnapshot } from '../../lib/dbRouter';
 import { db } from '../../lib/firebase';
 import {
   Activity,

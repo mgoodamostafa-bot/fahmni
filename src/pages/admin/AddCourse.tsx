@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   collection,
@@ -13,7 +13,7 @@ import {
   query,
   where,
   getDocs,
-} from 'firebase/firestore';
+} from '../../lib/dbRouter';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { ChevronLeft, Plus, Check, AlertCircle, Loader2, Image as ImageIcon } from 'lucide-react';

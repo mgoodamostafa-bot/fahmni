@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
+﻿import { useState, useEffect, useCallback } from 'react';
+import { collection, getDocs } from '../lib/dbRouter';
 import { db } from '../lib/firebase';
 import { dbRouter } from '../services/dbRouter';
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+﻿import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   collection,
   getDocs,
@@ -14,7 +14,7 @@ import {
   addDoc,
   serverTimestamp,
   runTransaction,
-} from 'firebase/firestore';
+} from '../../lib/dbRouter';
 import { Link } from 'react-router-dom';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';

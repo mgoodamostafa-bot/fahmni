@@ -1,4 +1,4 @@
-import {
+﻿import {
   collection,
   query,
   where,
@@ -9,7 +9,7 @@ import {
   QueryConstraint,
   DocumentData,
   QuerySnapshot,
-} from 'firebase/firestore';
+} from '../lib/dbRouter';
 import { getTenantDb } from '../lib/firebase';
 
 /**

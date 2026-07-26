@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+﻿import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { initTenantApp, masterDb } from '../lib/firebase';
 import { initTenantSupabase } from '../lib/supabase';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs } from '../lib/dbRouter';
 import { applyFruitTheme } from '../constants/fruitThemes';
 import type { FruitId } from '../constants/fruitThemes';
 import { WifiOff } from 'lucide-react';

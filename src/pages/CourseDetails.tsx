@@ -7,7 +7,7 @@ import {
   getDocs, writeBatch, arrayUnion,
   increment, runTransaction, serverTimestamp, addDoc,
   getCountFromServer
-} from 'firebase/firestore';
+} from '../lib/dbRouter';
 import { getTenantDb } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   collection,
   query,
@@ -8,7 +8,7 @@ import {
   getDocs,
   DocumentSnapshot,
   QueryConstraint,
-} from 'firebase/firestore';
+} from '../lib/dbRouter';
 import { db } from '../lib/firebase';
 
 interface UseFirestorePaginationOptions {

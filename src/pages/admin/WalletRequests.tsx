@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
   collection,
   deleteDoc,
@@ -11,7 +11,7 @@ import {
   serverTimestamp,
   increment,
   arrayUnion,
-} from 'firebase/firestore';
+} from '../../lib/dbRouter';
 import { db } from '../../lib/firebase';
 import { Wallet, CheckCircle, XCircle, Loader2, Search, Image as ImageIcon, Trash2, X, ZoomIn } from 'lucide-react';
 import { motion } from 'framer-motion';

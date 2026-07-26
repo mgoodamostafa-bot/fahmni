@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ClipboardList,
@@ -34,7 +34,7 @@ import {
   doc,
   getDoc,
   writeBatch,
-} from 'firebase/firestore';
+} from '../lib/dbRouter';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { smartGetDocs, chunkArray } from '../utils/firestore';

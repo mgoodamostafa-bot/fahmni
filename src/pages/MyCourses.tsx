@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, getDocs, orderBy, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, doc, getDoc } from '../lib/dbRouter';
 import { db, getTenantCollection, getTenantDoc } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { BookOpen, Zap, Search, ArrowRight, ChevronLeft, LayoutDashboard } from 'lucide-react';

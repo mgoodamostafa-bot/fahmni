@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { collection, query, getDocs, orderBy, limit, onSnapshot, where } from 'firebase/firestore';
+﻿import React, { useEffect, useState } from 'react';
+import { collection, query, getDocs, orderBy, limit, onSnapshot, where } from '../../lib/dbRouter';
 import { db } from '../../lib/firebase';
 import {
   DollarSign,

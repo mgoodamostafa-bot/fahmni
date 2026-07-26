@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, Clock, BookOpen, Star, ChevronLeft, Users } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs } from '../lib/dbRouter';
 import { db } from '../lib/firebase';
 import { ProgressBar } from './ProgressBar';
 

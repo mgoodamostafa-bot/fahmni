@@ -7,7 +7,7 @@ import {
   onSnapshot,
   addDoc,
   serverTimestamp,
-} from 'firebase/firestore';
+} from '../../../lib/dbRouter';
 import { db } from '../../../lib/firebase';
 import { CheckSquare, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';

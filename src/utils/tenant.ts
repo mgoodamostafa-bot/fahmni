@@ -1,9 +1,9 @@
-/**
+﻿/**
  * Multi-tenant Utilities
  * Provides enhanced tenant management and isolation
  */
 
-import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs } from '../lib/dbRouter';
 import { masterDb, initTenantApp } from '../lib/firebase';
 
 export interface TenantConfig {

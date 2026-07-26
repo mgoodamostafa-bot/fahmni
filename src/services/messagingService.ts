@@ -1,4 +1,4 @@
-import { 
+﻿import { 
   collection, 
   query, 
   where, 
@@ -12,7 +12,7 @@ import {
   increment,
   getDoc,
   setDoc
-} from 'firebase/firestore';
+} from '../lib/dbRouter';
 import { getTenantDb } from '../lib/firebase';
 
 export interface Conversation {

@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import {
   User,
   Mail,
@@ -55,7 +55,7 @@ import {
   serverTimestamp,
   getDocs,
   addDoc,
-} from 'firebase/firestore';
+} from '../lib/dbRouter';
 import { sendPasswordResetEmail, signOut } from 'firebase/auth';
 import { getTenantDb, getTenantAuth } from '../lib/firebase';
 import { QRCodeCanvas } from 'qrcode.react';

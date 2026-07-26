@@ -1,4 +1,4 @@
-import { useQuery, UseQueryOptions } from '@tanstack/react-query';
+﻿import { useQuery, UseQueryOptions } from '@tanstack/react-query';
 import {
   collection,
   query,
@@ -13,7 +13,7 @@ import {
   startAfter,
   orderBy,
   DocumentSnapshot,
-} from 'firebase/firestore';
+} from '../lib/dbRouter';
 import { db } from '../lib/firebase';
 import { useEffect, useState, useCallback } from 'react';
 

@@ -48,7 +48,7 @@ import {
   addDoc,
   serverTimestamp,
   runTransaction,
-} from 'firebase/firestore';
+} from '../lib/dbRouter';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, getTenantDb, storage } from '../lib/firebase';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Star,
@@ -18,7 +18,7 @@ import {
   Send,
   Lock,
 } from 'lucide-react';
-import { collection, getDocs, query, where, addDoc, updateDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, query, where, addDoc, updateDoc, doc } from '../lib/dbRouter';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { ExamSheet } from '../components/ExamSheet';

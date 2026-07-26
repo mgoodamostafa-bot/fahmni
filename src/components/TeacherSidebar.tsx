@@ -43,7 +43,7 @@ import { signOut } from 'firebase/auth';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { SocialLinks } from './SocialLinks';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from '../lib/dbRouter';
 import { useState, useEffect } from 'react';
 
 interface TeacherSidebarProps {

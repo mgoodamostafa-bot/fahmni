@@ -1,4 +1,4 @@
-import {
+﻿import {
   doc,
   getDoc,
   collection,
@@ -9,7 +9,7 @@ import {
   serverTimestamp,
   increment,
   arrayUnion,
-} from 'firebase/firestore';
+} from '../lib/dbRouter';
 import { getTenantDb } from '../lib/firebase';
 
 export interface Coupon {

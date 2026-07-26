@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc } from '../lib/dbRouter';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Award, BookOpen, Loader2, Download, CheckCircle2, Trophy, Clock, ChevronLeft } from 'lucide-react';

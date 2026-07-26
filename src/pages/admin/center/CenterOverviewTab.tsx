@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Building2,
@@ -17,7 +17,7 @@ import {
   FolderKanban,
   CheckSquare,
 } from 'lucide-react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where } from '../../../lib/dbRouter';
 import { db } from '../../../lib/firebase';
 import { isSupabaseConfigured, supabase } from '../../../lib/supabase';
 import { Center, Group, Student } from '../../../hooks/useCenterData';

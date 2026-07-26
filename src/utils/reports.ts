@@ -1,9 +1,9 @@
-/**
+﻿/**
  * Advanced Reports Utility
  * Provides functions for generating detailed reports
  */
 
-import { collection, getDocs, query, where, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, Timestamp } from '../lib/dbRouter';
 import { db } from '../lib/firebase';
 
 // Report types

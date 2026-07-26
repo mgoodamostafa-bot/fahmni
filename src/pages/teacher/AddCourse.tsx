@@ -10,7 +10,7 @@ import {
   arrayUnion,
   updateDoc,
   arrayRemove,
-} from 'firebase/firestore';
+} from '../../lib/dbRouter';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSettings } from '../../contexts/SettingsContext';

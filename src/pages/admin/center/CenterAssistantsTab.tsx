@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   collection,
   query,
@@ -9,7 +9,7 @@ import {
   deleteDoc,
   serverTimestamp,
   updateDoc,
-} from 'firebase/firestore';
+} from '../../../lib/dbRouter';
 import { db } from '../../../lib/firebase';
 import { useAuth } from '../../../contexts/AuthContext';
 import { ConfirmModal } from '../../../components/center/ConfirmModal';

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   FileUp,
   Database,
@@ -17,7 +17,7 @@ import {
   Info,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { collection, addDoc, writeBatch, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, writeBatch, doc, serverTimestamp } from '../../lib/dbRouter';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { extractTextFromPDF } from '../../utils/pdf';

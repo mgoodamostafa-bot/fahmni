@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
+﻿import React, { useState, useEffect } from 'react';
+import { collection, query, where, getDocs, getDoc, doc } from '../lib/dbRouter';
 import { getTenantDb } from '../lib/firebase';
 import { useTenant } from '../contexts/TenantContext';
 import { motion, AnimatePresence } from 'framer-motion';

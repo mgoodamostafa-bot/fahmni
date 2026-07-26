@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { GraduationCap, ShieldCheck, Zap, ChevronLeft, Sparkles, Lock, Eye, EyeOff, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { masterDb } from '../lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from '../lib/dbRouter';
 
 export const MainLandingPage = () => {
   const navigate = useNavigate();

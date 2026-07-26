@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Upload,
@@ -13,7 +13,7 @@ import {
   Calendar,
   Search,
 } from 'lucide-react';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs } from '../../lib/dbRouter';
 import { getTenantDb } from '../../lib/firebase';
 import { useNotifications } from '../../contexts/NotificationContext';
 

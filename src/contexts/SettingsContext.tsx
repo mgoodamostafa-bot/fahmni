@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
+﻿import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
+import { doc, getDoc } from '../lib/dbRouter';
 import { db } from '../lib/firebase';
 import { applyFruitTheme, DEFAULT_FRUIT } from '../constants/fruitThemes';
 import type { FruitId } from '../constants/fruitThemes';

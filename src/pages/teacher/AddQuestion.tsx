@@ -12,7 +12,7 @@ import {
   Trash2,
   Save,
 } from 'lucide-react';
-import { collection, addDoc, writeBatch, doc, query, getDocs, where } from 'firebase/firestore';
+import { collection, addDoc, writeBatch, doc, query, getDocs, where } from '../../lib/dbRouter';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { extractTextFromPDF, parseMcqWithRegex } from '../../utils/pdf';

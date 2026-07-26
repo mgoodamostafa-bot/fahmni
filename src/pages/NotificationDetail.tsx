@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from '../lib/dbRouter';
 import { db } from '../lib/firebase';
 import { useNotifications } from '../contexts/NotificationContext';
 import { motion } from 'framer-motion';

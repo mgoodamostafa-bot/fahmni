@@ -10,7 +10,7 @@ import {
   updateDoc,
   doc,
   serverTimestamp,
-} from 'firebase/firestore';
+} from '../lib/dbRouter';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { MessageSquare, Send, User, Clock, MessageCircle, Check, Trash2 } from 'lucide-react';

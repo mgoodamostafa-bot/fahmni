@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   collection,
   query,
@@ -11,7 +11,7 @@ import {
   writeBatch,
   updateDoc,
   increment,
-} from 'firebase/firestore';
+} from '../../../lib/dbRouter';
 import { db } from '../../../lib/firebase';
 import { isSupabaseConfigured, supabase } from '../../../lib/supabase';
 import { Center, Group, Student } from '../../../hooks/useCenterData';

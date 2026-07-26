@@ -22,7 +22,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { getTenantAuth, db } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from '../lib/dbRouter';
 import { useState, useEffect } from 'react';
 
 interface AdminSidebarProps {

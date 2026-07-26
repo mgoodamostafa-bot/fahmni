@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -26,7 +26,7 @@ import {
   writeBatch,
   doc,
   serverTimestamp,
-} from 'firebase/firestore';
+} from '../../lib/dbRouter';
 import { db } from '../../lib/firebase';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { mapStudentToSql } from '../../services/dbRouter';

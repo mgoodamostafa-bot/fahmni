@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { collection, getDocs, deleteDoc, doc, writeBatch, query, where } from 'firebase/firestore';
+import { collection, getDocs, deleteDoc, doc, writeBatch, query, where } from '../../lib/dbRouter';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -191,12 +191,139 @@ export const Maintenance: React.FC = () => {
           <div className="p-6 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center gap-4 text-emerald-400">
             <CheckCircle size={24} />
             <p className="text-xs font-bold">
-              قاعدة البيانات تعمل بشكل مستقر حالياً. جميع النسخ الاحتياطية يتم تفعيلها تلقائياً عبر
-              Firebase.
+              قاعدة البيانات تعمل بشكل محلي ومستقل 100%. التخزين آمن ومحمي ومجاني بدون أي فواتير.
             </p>
           </div>
         </div>
       </div>
+
+      {/* Backup & Restore Section */}
+      <BackupRestoreCard />
+    </div>
+  );
+};
+
+const BackupRestoreCard: React.FC = () => {
+  const [stats, setStats] = useState<{ collections: string[]; totalRecords: number; sizeKB: number }>({ collections: [], totalRecords: 0, sizeKB: 0 });
+  const [restoring, setRestoring] = useState(false);
+  const [restoreMsg, setRestoreMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const loadStats = async () => {
+    const { getDbStats } = await import('../../lib/dbRouter');
+    setStats(getDbStats());
+  };
+
+  React.useEffect(() => {
+    loadStats();
+  }, []);
+
+  const handleDownload = async () => {
+    const { downloadBackup } = await import('../../lib/dbRouter');
+    downloadBackup('fahmni_platform');
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setRestoring(true);
+    setRestoreMsg(null);
+
+    try {
+      const text = await file.text();
+      const { restoreFromBackup } = await import('../../lib/dbRouter');
+      const res = restoreFromBackup(text);
+
+      if (res.success) {
+        setRestoreMsg({
+          type: 'success',
+          text: `تم استرجاع النسخة الاحتياطية بنجاح! (${res.collections} مجموعة - ${res.records} عنصر)`
+        });
+        loadStats();
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } else {
+        setRestoreMsg({ type: 'error', text: `فشل الاسترجاع: ${res.error}` });
+      }
+    } catch (err: any) {
+      setRestoreMsg({ type: 'error', text: `خطأ في الملف: ${err.message}` });
+    } finally {
+      setRestoring(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  return (
+    <div className="glass-card p-10 border border-brand-purple/30 bg-brand-purple/5 space-y-6 rounded-3xl shadow-2xl">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4 text-brand-purple">
+          <Database size={36} />
+          <div>
+            <h2 className="text-2xl font-black text-white">النسخ الاحتياطي والاسترجاع الشامل (Backup & Restore)</h2>
+            <p className="text-sm text-gray-400 font-bold">تصدير واسترجاع بيانات المنصة بالكامل بضغط زر واحدة</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="bg-white/10 px-4 py-2 rounded-xl text-xs font-bold text-gray-300">
+            السجلات: <span className="text-brand-purple font-black">{stats.totalRecords}</span>
+          </div>
+          <div className="bg-white/10 px-4 py-2 rounded-xl text-xs font-bold text-gray-300">
+            الحجم: <span className="text-emerald-400 font-black">{stats.sizeKB} KB</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+        {/* Export Card */}
+        <div className="bg-black/30 p-8 rounded-2xl border border-white/10 space-y-4 text-right">
+          <h3 className="text-lg font-black text-emerald-400">📥 تصدير نسخة احتياطية (.JSON)</h3>
+          <p className="text-xs text-gray-400 leading-relaxed font-bold">
+            قم بتنزيل ملف يحتوي على كافة بيانات المنصة (الكورسات، الدروس، الحسابات، الامتحانات، النتائج).
+          </p>
+          <button
+            onClick={handleDownload}
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+          >
+            تنزيل ملف النسخة الاحتياطية (.JSON)
+          </button>
+        </div>
+
+        {/* Import Card */}
+        <div className="bg-black/30 p-8 rounded-2xl border border-white/10 space-y-4 text-right">
+          <h3 className="text-lg font-black text-brand-blue">📤 استرجاع نسخة احتياطية (.JSON)</h3>
+          <p className="text-xs text-gray-400 leading-relaxed font-bold">
+            اختر ملف نسخة احتياطية سابقة لاستعادة كافة محتويات المنصة فوراً.
+          </p>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".json"
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={restoring}
+            className="w-full bg-brand-blue hover:bg-blue-600 disabled:opacity-50 text-white font-black py-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+          >
+            {restoring ? <Loader2 className="animate-spin" /> : null}
+            رفع واسترجاع الملف (.JSON)
+          </button>
+        </div>
+      </div>
+
+      {restoreMsg && (
+        <div
+          className={`p-4 rounded-xl text-sm font-bold text-center ${
+            restoreMsg.type === 'success' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'
+          }`}
+        >
+          {restoreMsg.text}
+        </div>
+      )}
     </div>
   );
 };

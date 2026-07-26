@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+﻿import React, { useEffect, useState, useRef } from 'react';
 import {
   collection,
   getDocs,
@@ -11,7 +11,7 @@ import {
   getDoc,
   writeBatch,
   serverTimestamp,
-} from 'firebase/firestore';
+} from '../../lib/dbRouter';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getTenantAuth, getTenantDb, getTenantStorage } from '../../lib/firebase';
 import {

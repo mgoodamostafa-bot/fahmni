@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { collection, doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot } from '../../../lib/dbRouter';
 import { db } from '../../../lib/firebase';
 import type { Enrollment } from './types';
 

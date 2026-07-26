@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+﻿import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   BookOpen,
@@ -10,7 +10,7 @@ import {
   MessageCircle,
   Globe,
 } from 'lucide-react';
-import { collection, getDocs, query, limit } from 'firebase/firestore';
+import { collection, getDocs, query, limit } from '../lib/dbRouter';
 import { getTenantDb, db as firebaseDb, masterDb, getTenantCollection } from '../lib/firebase';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';

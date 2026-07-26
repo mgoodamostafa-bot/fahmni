@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   collection,
   getDocs,
@@ -8,7 +8,7 @@ import {
   deleteDoc,
   onSnapshot,
   serverTimestamp,
-} from 'firebase/firestore';
+} from '../../lib/dbRouter';
 import { db } from '../../lib/firebase';
 import { MapPin, Plus, Trash2, Edit2, Loader2, Home, Phone, Users, Save, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';

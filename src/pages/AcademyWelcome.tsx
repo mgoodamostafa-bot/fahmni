@@ -17,7 +17,7 @@ import {
   Instagram,
   Sparkles,
 } from 'lucide-react';
-import { collection, getDocs, query, limit, where } from 'firebase/firestore';
+import { collection, getDocs, query, limit, where } from '../lib/dbRouter';
 import { db } from '../lib/firebase';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';

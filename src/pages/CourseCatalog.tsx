@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Search, BookOpen } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { collection, onSnapshot, query, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, query, getDocs } from '../lib/dbRouter';
 import { db, getTenantCollection } from '../lib/firebase';
 import { CourseCard } from '../components/CourseCard';
 import { useAuth } from '../contexts/AuthContext';

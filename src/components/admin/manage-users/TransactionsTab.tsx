@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { collection, doc, getDoc, query, onSnapshot } from 'firebase/firestore';
+﻿import React, { useEffect, useState } from 'react';
+import { collection, doc, getDoc, query, onSnapshot } from '../../../lib/dbRouter';
 import { db } from '../../../lib/firebase';
 import { SearchInput } from '../../SearchInput';
 import type { Transaction } from './types';

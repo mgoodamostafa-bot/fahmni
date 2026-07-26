@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { Navbar } from '../components/Navbar';
 import { CourseCard } from '../components/CourseCard';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc } from '../lib/dbRouter';
 import { getTenantDb, getTenantCollection, getTenantDoc } from '../lib/firebase';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';

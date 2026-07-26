@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { CreditCard, Save, CheckCircle, Smartphone } from 'lucide-react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from '../../lib/dbRouter';
 import { db } from '../../lib/firebase';
 import { useSettings } from '../../contexts/SettingsContext';
 

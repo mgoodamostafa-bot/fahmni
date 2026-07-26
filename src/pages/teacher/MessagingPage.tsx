@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { messagingService, Conversation, Message } from '../../services/messagingService';
 import { ChatBubble } from '../../components/ChatBubble';
 import { ConversationList } from '../../components/ConversationList';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTenant } from '../../contexts/TenantContext';
 import { getTenantDb } from '../../lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs } from '../../lib/dbRouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Plus, ArrowRight, MessageCircle, Search, X, Loader2, Users } from 'lucide-react';
 
