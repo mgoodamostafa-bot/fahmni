@@ -92,7 +92,7 @@ export const Register: React.FC = () => {
     sessionStorage.setItem('is_registering', 'true');
 
     try {
-      const isSqlEngine = (window as any).VITE_DB_TYPE === 'sqlite' || import.meta.env.VITE_DB_TYPE === 'sqlite';
+      const isSqlEngine = (window as any).VITE_DB_TYPE === 'sqlite' || import.meta.env.VITE_DB_TYPE === 'sqlite' || (window as any).VITE_STANDALONE_MODE === 'true' || import.meta.env.VITE_STANDALONE_MODE === 'true';
       if (isSqlEngine) {
         try {
           const res = await fetch('/api/auth/register', {

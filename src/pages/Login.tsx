@@ -93,7 +93,7 @@ export const Login: React.FC = () => {
     setError('');
     setIsGhostAccount(false);
     try {
-      const isSqlEngine = (window as any).VITE_DB_TYPE === 'sqlite' || import.meta.env.VITE_DB_TYPE === 'sqlite';
+      const isSqlEngine = (window as any).VITE_DB_TYPE === 'sqlite' || import.meta.env.VITE_DB_TYPE === 'sqlite' || (window as any).VITE_STANDALONE_MODE === 'true' || import.meta.env.VITE_STANDALONE_MODE === 'true';
       if (isSqlEngine) {
         try {
           const res = await fetch('/api/auth/login', {
@@ -107,7 +107,7 @@ export const Login: React.FC = () => {
           if (res.ok && data.user) {
             localStorage.setItem('fahmni_sqlite_user', JSON.stringify(data.user));
             alert('🎉 تم تسجيل الدخول بنجاح!');
-            if (data.user.role === 'admin') {
+            if (data.user.role === 'admin' || data.user.isOwner) {
               navigate('/admin/dashboard', { replace: true });
             } else {
               navigate('/', { replace: true });
@@ -120,7 +120,7 @@ export const Login: React.FC = () => {
           if ((window as any).VITE_DB_TYPE === 'sqlite') {
             throw sqlErr;
           }
-          console.warn('SQLite API endpoint unavailable, falling back to Firebase Auth login.', sqlErr);
+          console.warn('SQLite API endpoint unavailable, checking local storage profile.', sqlErr);
         }
       }
 

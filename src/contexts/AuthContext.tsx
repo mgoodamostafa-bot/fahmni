@@ -149,7 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setProfileHanging(true);
     }, 12000);
 
-    const isSqlEngine = (window as any).VITE_DB_TYPE === 'sqlite' || import.meta.env.VITE_DB_TYPE === 'sqlite';
+    const isSqlEngine = (window as any).VITE_DB_TYPE === 'sqlite' || import.meta.env.VITE_DB_TYPE === 'sqlite' || (window as any).VITE_STANDALONE_MODE === 'true' || import.meta.env.VITE_STANDALONE_MODE === 'true';
     if (isSqlEngine) {
       const savedUserStr = localStorage.getItem('fahmni_sqlite_user');
       if (savedUserStr) {
